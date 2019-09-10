@@ -8,6 +8,7 @@ from cefpython3 import cefpython as cef
 import platform
 import sys
 import os
+import base64
 
 # Platforms
 WINDOWS = (platform.system() == "Windows")
@@ -33,9 +34,52 @@ HEIGHT = 640
 g_count_windows = 0
 
 
+def html_to_data_uri(html, js_callback=None):
+
+    # This function is called in two ways:
+
+    # 1. From Python: in this case value is returned
+
+    # 2. From Javascript: in this case value cannot be returned because
+
+    #    inter-process messaging is asynchronous, so must return value
+
+    #    by calling js_callback.
+
+    html = html.encode("utf-8", "replace")
+
+    b64 = base64.b64encode(html).decode("utf-8", "replace")
+
+    ret = "data:text/html;base64,{data}".format(data=b64)
+
+    if js_callback:
+
+        js_print(js_callback.GetFrame().GetBrowser(),
+
+                 "Python", "html_to_data_uri",
+
+                 "Called from Javascript. Will call Javascript callback now.")
+
+        js_callback.Call(ret)
+
+    else:
+
+        return ret
+
+
+my_html = """
+<!doctype html>
+
+<html lang="en">
+<body>
+Lia was here. She didn't type this though. 
+</body>
+</html>
+"""
+
 def main():
     check_versions()
-    sys.excepthook = cef.ExceptHook  # To shutdown all CEF processes on error
+    #sys.excepthook = cef.ExceptHook  # To shutdown all CEF processes on error
     settings = {}
     if MAC:
         # Issue #442 requires enabling message pump on Mac
@@ -157,7 +201,7 @@ class MainFrame(wx.Frame):
         window_info.SetAsChild(self.browser_panel.GetHandle(),
                                [0, 0, width, height])
         self.browser = cef.CreateBrowserSync(window_info,
-                                             url="https://ramcdougal.com/")
+                                             url=html_to_data_uri(my_html))
         self.browser.SetClientHandler(FocusHandler())
 
     def OnSetFocus(self, _):
