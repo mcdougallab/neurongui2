@@ -2,13 +2,14 @@
 # https://github.com/cztomczak/cefpython/blob/master/examples/wxpython.py
 
 import wx
-import wx.py.crust
 
 from cefpython3 import cefpython as cef
 import platform
 import sys
 import os
 import base64
+import threading
+import time
 
 # Platforms
 WINDOWS = (platform.system() == "Windows")
@@ -35,47 +36,24 @@ g_count_windows = 0
 
 
 def html_to_data_uri(html, js_callback=None):
-
     # This function is called in two ways:
-
     # 1. From Python: in this case value is returned
-
     # 2. From Javascript: in this case value cannot be returned because
-
     #    inter-process messaging is asynchronous, so must return value
-
     #    by calling js_callback.
-
     html = html.encode("utf-8", "replace")
-
     b64 = base64.b64encode(html).decode("utf-8", "replace")
-
     ret = "data:text/html;base64,{data}".format(data=b64)
-
     if js_callback:
-
         js_print(js_callback.GetFrame().GetBrowser(),
-
                  "Python", "html_to_data_uri",
-
                  "Called from Javascript. Will call Javascript callback now.")
-
         js_callback.Call(ret)
-
     else:
-
         return ret
 
-
-my_html = """
-<!doctype html>
-
-<html lang="en">
-<body>
-Lia was here. She didn't type this though. 
-</body>
-</html>
-"""
+with open('simple.html') as f:
+    my_html = f.read()
 
 def main():
     check_versions()
@@ -320,18 +298,50 @@ def make_terminal():
     # hmm... maybe a bad idea; should we transfer over a gui variable?
     shell = wx.py.shell.Shell(parent=window, locals=shared_locals)
     _all_windows.append(shell)
-    shell.run("print('try make_terminal() or make_browser() or quit()')", verbose=False, prompt=False)
+    shell.run("print('Type make_terminal() or make_browser() or quit()')", verbose=False, prompt=False)
     window.Show(True) 
 
 def make_browser():
     frame = MainFrame()
     frame.Show()
     _all_windows.append(frame)
+    return frame
         
+def send_browser_msg(message, browser):
+    browser.browser.ExecuteFunction("print_stuff",message)
 
-shared_locals = {'make_terminal': make_terminal, 'make_browser': make_browser, 'quit': sys.exit}
+def show_vars(browser):
+    send_browser_msg(str(shared_locals.keys()), browser)
+
+class LoopTimer(threading.Thread) :
+  """
+  a Timer that calls f every interval
+  """
+  def __init__(self, interval, fun, *param) :
+    """
+    @param interval: time in seconds between call to fun(
+    @param fun: the function to call on timer update
+    """
+    self.started = False
+    self.interval = interval
+    self.fun = fun
+    self.param = param
+    threading.Thread.__init__(self)
+    self.setDaemon(True)
+
+  def run(self) :
+    self.started = True
+    while True:
+      self.fun(*self.param)
+      time.sleep(self.interval)
+
+def monitor_vars(browser):
+    timer = LoopTimer(0.1, show_vars, browser)
+    timer.start()
 
 
+shared_locals = {'make_terminal': make_terminal, 'make_browser': make_browser, 'quit': sys.exit, 
+'send_browser_msg':send_browser_msg, 'show_vars': show_vars,'monitor_vars':monitor_vars}
 
 if __name__ == '__main__':
     main()
