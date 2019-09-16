@@ -2,7 +2,7 @@
 # https://github.com/cztomczak/cefpython/blob/master/examples/wxpython.py
 
 import wx
-
+import wx.py.shell
 from cefpython3 import cefpython as cef
 import platform
 import sys
@@ -180,7 +180,13 @@ class MainFrame(wx.Frame):
                                [0, 0, width, height])
         self.browser = cef.CreateBrowserSync(window_info,
                                              url=html_to_data_uri(my_html))
+        self.set_browser_callbacks()
         self.browser.SetClientHandler(FocusHandler())
+
+    def set_browser_callbacks(self):
+        self.bindings = cef.JavascriptBindings(bindToFrames=True, bindToPopups=True)
+        self.bindings.SetFunction("_print_to_terminal", _print_to_terminal)
+        self.browser.SetJavascriptBindings(self.bindings)
 
     def OnSetFocus(self, _):
         if not self.browser:
@@ -298,7 +304,9 @@ def make_terminal():
     # hmm... maybe a bad idea; should we transfer over a gui variable?
     shell = wx.py.shell.Shell(parent=window, locals=shared_locals)
     _all_windows.append(shell)
+    shared_locals['shell'] = shell
     shell.run("print('Type make_terminal() or make_browser() or quit()')", verbose=False, prompt=False)
+    #shell.write("Type make_terminal() or make_browser() or quit()\n")
     window.Show(True) 
 
 def make_browser():
@@ -339,6 +347,9 @@ def monitor_vars(browser):
     timer = LoopTimer(0.1, show_vars, browser)
     timer.start()
 
+def _print_to_terminal():
+    # experimental info relayed to terminal from browser action
+    print("So this worked.")
 
 shared_locals = {'make_terminal': make_terminal, 'make_browser': make_browser, 'quit': sys.exit, 
 'send_browser_msg':send_browser_msg, 'show_vars': show_vars,'monitor_vars':monitor_vars}
