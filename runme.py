@@ -183,9 +183,13 @@ class MainFrame(wx.Frame):
         self.set_browser_callbacks()
         self.browser.SetClientHandler(FocusHandler())
 
+        # send variable values to browser as needed
+        monitor_browser_vars(self.browser)
+
     def set_browser_callbacks(self):
         self.bindings = cef.JavascriptBindings(bindToFrames=True, bindToPopups=True)
         self.bindings.SetFunction("_print_to_terminal", _print_to_terminal)
+        self.bindings.SetFunction("_update_vars", _update_vars)
         self.browser.SetJavascriptBindings(self.bindings)
 
     def OnSetFocus(self, _):
@@ -347,12 +351,30 @@ def monitor_vars(browser):
     timer = LoopTimer(0.1, show_vars, browser)
     timer.start()
 
+def monitor_browser_vars(browser):
+    timer = LoopTimer(0.1, _update_browser_vars, browser)
+    timer.start()
+
 def _print_to_terminal():
     # experimental info relayed to terminal from browser action
     print("So this worked.")
 
+def _update_vars(variable, value):
+    if variable == 'var_a':
+            shared_locals['var_a'] = float(value)
+    elif variable == 'var_b':
+            shared_locals['var_b'] = float(value)
+    else:
+        print('unknown variable: ', variable)
+
+def _update_browser_vars(browser):  
+    browser.ExecuteJavascript("if ((document.getElementById('var_a') != document.activeElement) || !(document.hasFocus())) {document.getElementById('var_a').value = " + str(shared_locals['var_a']) + "}")
+    browser.ExecuteJavascript("if ((document.getElementById('var_b') != document.activeElement) || !(document.hasFocus())) {document.getElementById('var_b').value = " + str(shared_locals['var_b']) + "}")
+    # for now just updating all relevant variables on every loop
+
 shared_locals = {'make_terminal': make_terminal, 'make_browser': make_browser, 'quit': sys.exit, 
-'send_browser_msg':send_browser_msg, 'show_vars': show_vars,'monitor_vars':monitor_vars}
+'send_browser_msg':send_browser_msg, 'show_vars': show_vars,'monitor_vars':monitor_vars,
+'var_a':1, 'var_b':42}
 
 if __name__ == '__main__':
     main()

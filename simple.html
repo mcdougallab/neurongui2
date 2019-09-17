@@ -12,10 +12,40 @@
 <body>
 <p>Lia was here and typed some stuff.</p>
 <button id="the_button">Print Info Somewhere</button>
+<br><br>
+<label>A: </label>
+<input type='text' id='var_a' name='var_a'>
+<br>
+<label>B: </label>
+<input type='text' id='var_b' name='var_b'>
 
 <script>
     $('#the_button').click(function() {
         _print_to_terminal()
+    })
+    $('#var_a').keypress(function(event){
+        // from https://www.mkyong.com/jquery/how-to-check-if-an-enter-key-is-pressed-with-jquery/
+        var keycode = (event.keyCode ? event.keyCode : event.which);
+        if (keycode == '13'){
+            _update_vars('var_a', $('#var_a').val())
+            $('#var_a').blur()
+        }
+        event.stopPropagation()
+    })
+    $('#var_a').focusout(function() {   // also update if focus is lost on textbox A
+        _update_vars('var_a', $('#var_a').val())
+    })
+    $('#var_b').keypress(function(event){
+        // from https://www.mkyong.com/jquery/how-to-check-if-an-enter-key-is-pressed-with-jquery/
+        var keycode = (event.keyCode ? event.keyCode : event.which);
+        if (keycode == '13'){
+            _update_vars('var_b', $('#var_b').val())
+            $('#var_b').blur()
+        }
+        event.stopPropagation()
+    })
+    $('#var_b').focusout(function() {   // also update if focus is lost on textbox A
+        _update_vars('var_b', $('#var_b').val())
     })
 </script>
 
