@@ -10,6 +10,8 @@ import os
 import base64
 import threading
 import time
+import json
+import copy
 
 # Platforms
 WINDOWS = (platform.system() == "Windows")
@@ -184,12 +186,14 @@ class MainFrame(wx.Frame):
         self.browser.SetClientHandler(FocusHandler())
 
         # send variable values to browser as needed
-        monitor_browser_vars(self.browser)
+        self.monitor_loop = monitor_browser_vars(self.browser)
 
     def set_browser_callbacks(self):
         self.bindings = cef.JavascriptBindings(bindToFrames=True, bindToPopups=True)
         self.bindings.SetFunction("_print_to_terminal", _print_to_terminal)
         self.bindings.SetFunction("_update_vars", _update_vars)
+        self.bindings.SetFunction("_py_function_handler", _py_function_handler)
+        self.bindings.SetFunction("_set_relevant_vars", _set_relevant_vars)
         self.browser.SetJavascriptBindings(self.bindings)
 
     def OnSetFocus(self, _):
@@ -219,6 +223,7 @@ class MainFrame(wx.Frame):
 
         if MAC:
             # On Mac things work differently, other steps are required
+            self.monitor_loop.running = False
             self.browser.CloseBrowser()
             self.clear_browser_references()
             self.Destroy()
@@ -234,6 +239,7 @@ class MainFrame(wx.Frame):
             # Calling browser.CloseBrowser() and/or self.Destroy()
             # in OnClose may cause app crash on some paltforms in
             # some use cases, details in Issue #107.
+            self.monitor_loop.running = False
             self.browser.ParentWindowWillClose()
             event.Skip()
             self.clear_browser_references()
@@ -318,12 +324,6 @@ def make_browser():
     frame.Show()
     _all_windows.append(frame)
     return frame
-        
-def send_browser_msg(message, browser):
-    browser.browser.ExecuteFunction("print_stuff",message)
-
-def show_vars(browser):
-    send_browser_msg(str(shared_locals.keys()), browser)
 
 class LoopTimer(threading.Thread) :
   """
@@ -343,23 +343,26 @@ class LoopTimer(threading.Thread) :
 
   def run(self) :
     self.started = True
-    while True:
+    self.running = True
+    while self.running==True:
       self.fun(*self.param)
       time.sleep(self.interval)
 
-def monitor_vars(browser):
-    timer = LoopTimer(0.1, show_vars, browser)
-    timer.start()
-
 def monitor_browser_vars(browser):
-    timer = LoopTimer(0.1, _update_browser_vars, browser)
+    locals_copy = {} # initiate but don't know rel_vars yet
+    timer = LoopTimer(0.1, _update_browser_vars, browser, locals_copy)
     timer.start()
+    return timer
 
 def _print_to_terminal():
     # experimental info relayed to terminal from browser action
     print("So this worked.")
 
+def _py_function_handler(function_string):
+    exec(function_string)
+
 def _update_vars(variable, value):
+    # update any variables sent in by the browser
     if variable == 'var_a':
             shared_locals['var_a'] = float(value)
     elif variable == 'var_b':
@@ -367,14 +370,46 @@ def _update_vars(variable, value):
     else:
         print('unknown variable: ', variable)
 
-def _update_browser_vars(browser):  
-    browser.ExecuteJavascript("if ((document.getElementById('var_a') != document.activeElement) || !(document.hasFocus())) {document.getElementById('var_a').value = " + str(shared_locals['var_a']) + "}")
-    browser.ExecuteJavascript("if ((document.getElementById('var_b') != document.activeElement) || !(document.hasFocus())) {document.getElementById('var_b').value = " + str(shared_locals['var_b']) + "}")
-    # for now just updating all relevant variables on every loop
+def _set_relevant_vars(to_update):
+    global rel_vars
+    # receive JS declaration of relevant variables
+    rel_vars = json.loads(to_update)
 
-shared_locals = {'make_terminal': make_terminal, 'make_browser': make_browser, 'quit': sys.exit, 
-'send_browser_msg':send_browser_msg, 'show_vars': show_vars,'monitor_vars':monitor_vars,
-'var_a':1, 'var_b':42}
+def delete_var(v):
+    del shared_locals[v]
+
+def find_changed_vars(old_copy, new_locals):
+    # input is copy of relevant variable dict and latest shared_locals; find which are changed or deleted
+    changed = {}
+    deleted = []
+    for v in rel_vars:
+        if (new_locals.get(v) == None) and (v in old_copy.keys()):
+            deleted.append(v)
+        elif new_locals.get(v) != old_copy.get(v):
+            changed[v] = new_locals.get(v)
+
+    return [changed, deleted]
+
+def _update_browser_vars(browser, locals_copy):  
+    # currently are not dealing with hasFocus in this way
+    #browser.ExecuteJavascript("if ((document.getElementById('var_a') != document.activeElement) || !(document.hasFocus())) {document.getElementById('var_a').value = " + str(shared_locals['var_a']) + "}")
+    #browser.ExecuteJavascript("if ((document.getElementById('var_b') != document.activeElement) || !(document.hasFocus())) {document.getElementById('var_b').value = " + str(shared_locals['var_b']) + "}")
+
+    # create dictionary of the changed variables 
+    updates = find_changed_vars(locals_copy, shared_locals)
+    changed_vars = updates[0]
+    locals_copy.update(changed_vars)
+    # handle deletions separately 
+    deleted_vars = updates[1]
+    for d in deleted_vars:
+        del locals_copy[d]
+    # now update the displays of any changed variables
+    browser.ExecuteJavascript("update_html_variable_displays({})".format(json.dumps([changed_vars, deleted_vars])))
+
+shared_locals = {'make_terminal': make_terminal, 'make_browser': make_browser, 'quit': sys.exit, 'delete_var':delete_var,
+'var_a':1, 'var_b':42, 'num_neurons':5}
+
+rel_vars = []
 
 if __name__ == '__main__':
     main()

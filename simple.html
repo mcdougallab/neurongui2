@@ -3,51 +3,66 @@
 <html lang="en">
     <head>
         <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script> 
-        <script>
-            function print_stuff (msg) {
-                $('body').html(msg);
-            }
-        </script>
     </head>
 <body>
-<p>Lia was here and typed some stuff.</p>
-<button id="the_button">Print Info Somewhere</button>
+<button id="the_button" data-onclick="_print_to_terminal()">Print Info Somewhere</button>
 <br><br>
 <label>A: </label>
-<input type='text' id='var_a' name='var_a'>
+<input type='text' id="var_a" data-variable="var_a">
 <br>
 <label>B: </label>
-<input type='text' id='var_b' name='var_b'>
+<input type='text' id="var_b" data-variable="var_b">
+<br><br>
+
+<!-- span example -->
+The variable num_neurons is equal to <span data-variable="num_neurons"></span>.
+<button data-onclick="print('Do something else')">Click me</button>
 
 <script>
-    $('#the_button').click(function() {
-        _print_to_terminal()
-    })
-    $('#var_a').keypress(function(event){
+    // Tell python the relevant variables to update
+    var to_update = [];
+    $('[data-variable]').each( function () {
+        to_update.push($(this).attr('data-variable'));
+    });
+    _set_relevant_vars(JSON.stringify(to_update));
+
+    // update any changed variables sent from python
+    var update_html_variable_displays = function(changed_vars) {
+        $.each(changed_vars[0], function(key, value) {
+            $("span[data-variable='"+key+"']").text(value);
+            $("input[data-variable='"+key+"']").val(value);
+        });
+        $.each(changed_vars[1], function(index, key) {
+            // deleted variables. individual handling maybe?
+            $("span[data-variable='"+key+"']").text("");
+            $("input[data-variable='"+key+"']").val("");
+        });
+    };
+
+    // attach button clicks to correct python functions
+    $('[data-onclick]').click(function() {
+        _py_function_handler($(this).attr('data-onclick'));
+    });
+
+    // behavior for all input (could specify to a certain class of inputs if needed)
+    $('input').keypress(function(event){
         // from https://www.mkyong.com/jquery/how-to-check-if-an-enter-key-is-pressed-with-jquery/
         var keycode = (event.keyCode ? event.keyCode : event.which);
         if (keycode == '13'){
-            _update_vars('var_a', $('#var_a').val())
-            $('#var_a').blur()
+            _update_vars($(this).attr('data-variable'), $(this).val())
+            $(this).blur()
         }
         event.stopPropagation()
-    })
-    $('#var_a').focusout(function() {   // also update if focus is lost on textbox A
-        _update_vars('var_a', $('#var_a').val())
-    })
-    $('#var_b').keypress(function(event){
-        // from https://www.mkyong.com/jquery/how-to-check-if-an-enter-key-is-pressed-with-jquery/
-        var keycode = (event.keyCode ? event.keyCode : event.which);
-        if (keycode == '13'){
-            _update_vars('var_b', $('#var_b').val())
-            $('#var_b').blur()
-        }
-        event.stopPropagation()
-    })
-    $('#var_b').focusout(function() {   // also update if focus is lost on textbox A
-        _update_vars('var_b', $('#var_b').val())
-    })
+    });
+    $('input').focusout(function() {   // also update if focus is lost on input
+        _update_vars($(this).attr('data-variable'), $(this).val())
+    });
+
 </script>
 
 </body>
 </html>
+
+
+
+
