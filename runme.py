@@ -12,6 +12,8 @@ import threading
 import time
 import json
 import copy
+from weakref import WeakValueDictionary
+from neuron import h
 
 # Platforms
 WINDOWS = (platform.system() == "Windows")
@@ -35,14 +37,16 @@ HEIGHT = 640
 
 # Globals
 g_count_windows = 0
+browser_created_count = 0   #for the weak value dict of browsers
+browser_weakvaldict = WeakValueDictionary()
 
-
-def html_to_data_uri(html, js_callback=None):
+def html_to_data_uri(html, browser_id, js_callback=None):
     # This function is called in two ways:
     # 1. From Python: in this case value is returned
     # 2. From Javascript: in this case value cannot be returned because
     #    inter-process messaging is asynchronous, so must return value
     #    by calling js_callback.
+    html = html.replace("BROWSER_ID_GOES_HERE", str(browser_id))
     html = html.encode("utf-8", "replace")
     b64 = base64.b64encode(html).decode("utf-8", "replace")
     ret = "data:text/html;base64,{data}".format(data=b64)
@@ -175,18 +179,19 @@ class MainFrame(wx.Frame):
         self.SetMenuBar(menubar)
 
     def embed_browser(self):
+        global browser_created_count, browser_weakvaldict
+        self.browser_id = browser_created_count
+
         window_info = cef.WindowInfo()
         (width, height) = self.browser_panel.GetClientSize().Get()
         assert self.browser_panel.GetHandle(), "Window handle not available"
         window_info.SetAsChild(self.browser_panel.GetHandle(),
                                [0, 0, width, height])
         self.browser = cef.CreateBrowserSync(window_info,
-                                             url=html_to_data_uri(my_html))
+                                             url=html_to_data_uri(my_html, self.browser_id))
         self.set_browser_callbacks()
         self.browser.SetClientHandler(FocusHandler())
-
-        # send variable values to browser as needed
-        self.monitor_loop = monitor_browser_vars(self.browser)
+        browser_weakvaldict[self.browser_id] = self # create mapping to frame object in weak value dict
 
     def set_browser_callbacks(self):
         self.bindings = cef.JavascriptBindings(bindToFrames=True, bindToPopups=True)
@@ -320,6 +325,8 @@ def make_terminal():
     window.Show(True) 
 
 def make_browser():
+    global browser_created_count
+    browser_created_count += 1
     frame = MainFrame()
     frame.Show()
     _all_windows.append(frame)
@@ -371,9 +378,11 @@ def _update_vars(variable, value):
         print('unknown variable: ', variable)
 
 def _set_relevant_vars(to_update):
-    global rel_vars
+    global rel_vars, browser_weakvaldict
     # receive JS declaration of relevant variables
-    rel_vars = json.loads(to_update)
+    rel_vars, browser_id = json.loads(to_update)
+    # send variable values to browser as needed
+    browser_weakvaldict[browser_id].monitor_loop = monitor_browser_vars(browser_weakvaldict[browser_id].browser)
 
 def delete_var(v):
     del shared_locals[v]
@@ -394,20 +403,17 @@ def _update_browser_vars(browser, locals_copy):
     # currently are not dealing with hasFocus in this way
     #browser.ExecuteJavascript("if ((document.getElementById('var_a') != document.activeElement) || !(document.hasFocus())) {document.getElementById('var_a').value = " + str(shared_locals['var_a']) + "}")
     #browser.ExecuteJavascript("if ((document.getElementById('var_b') != document.activeElement) || !(document.hasFocus())) {document.getElementById('var_b').value = " + str(shared_locals['var_b']) + "}")
-
     # create dictionary of the changed variables 
-    updates = find_changed_vars(locals_copy, shared_locals)
-    changed_vars = updates[0]
+    changed_vars, deleted_vars = find_changed_vars(locals_copy, shared_locals)
     locals_copy.update(changed_vars)
     # handle deletions separately 
-    deleted_vars = updates[1]
     for d in deleted_vars:
         del locals_copy[d]
     # now update the displays of any changed variables
     browser.ExecuteJavascript("update_html_variable_displays({})".format(json.dumps([changed_vars, deleted_vars])))
 
 shared_locals = {'make_terminal': make_terminal, 'make_browser': make_browser, 'quit': sys.exit, 'delete_var':delete_var,
-'var_a':1, 'var_b':42, 'num_neurons':5}
+'var_a':1, 'var_b':42, 'num_neurons':5, 'barplot_data':[1,2,3,4,5], 'sec':h.Section(name='sec'), 'weakdict':browser_weakvaldict}
 
 rel_vars = []
 

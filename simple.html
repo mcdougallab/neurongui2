@@ -2,7 +2,9 @@
 
 <html lang="en">
     <head>
-        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script> 
+        <meta charset="utf-8">
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+        <script src="https://d3js.org/d3.v5.min.js"></script> 
     </head>
 <body>
 <button id="the_button" data-onclick="_print_to_terminal()">Print Info Somewhere</button>
@@ -13,6 +15,7 @@
 <label>B: </label>
 <input type='text' id="var_b" data-variable="var_b">
 <br><br>
+<!--<div class="barplot" data-variable="barplot_data" style="width:300px; height:300px"></div>-->
 
 <!-- span example -->
 The variable num_neurons is equal to <span data-variable="num_neurons"></span>.
@@ -21,21 +24,26 @@ The variable num_neurons is equal to <span data-variable="num_neurons"></span>.
 <script>
     // Tell python the relevant variables to update
     var to_update = [];
+    var browser_id = BROWSER_ID_GOES_HERE;
+
     $('[data-variable]').each( function () {
         to_update.push($(this).attr('data-variable'));
     });
-    _set_relevant_vars(JSON.stringify(to_update));
+    _set_relevant_vars(JSON.stringify([to_update, browser_id]));
 
     // update any changed variables sent from python
     var update_html_variable_displays = function(changed_vars) {
         $.each(changed_vars[0], function(key, value) {
-            $("span[data-variable='"+key+"']").text(value);
-            $("input[data-variable='"+key+"']").val(value);
+            $(`span[data-variable="${key}"]`).text(value);
+            $(`input[data-variable="${key}"]`).val(value);
+            /*$(`div[data-variable="${key}"][class='barplot']`).each( function() {
+                make_barplot(value, "."+key);
+            })*/
         });
         $.each(changed_vars[1], function(index, key) {
             // deleted variables. individual handling maybe?
-            $("span[data-variable='"+key+"']").text("");
-            $("input[data-variable='"+key+"']").val("");
+            $(`span[data-variable="${key}"]`).text("");
+            $(`input[data-variable="${key}"]`).val("");
         });
     };
 
@@ -57,6 +65,11 @@ The variable num_neurons is equal to <span data-variable="num_neurons"></span>.
     $('input').focusout(function() {   // also update if focus is lost on input
         _update_vars($(this).attr('data-variable'), $(this).val())
     });
+
+    function make_barplot(dat, target_class) {
+        return "spam";
+    };
+
 
 </script>
 
