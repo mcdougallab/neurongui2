@@ -4,75 +4,113 @@
     <head>
         <meta charset="utf-8">
         <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
-        <script src="https://d3js.org/d3.v5.min.js"></script> 
+        <script src="https://d3js.org/d3.v5.min.js"></script>
     </head>
 <body>
-<button id="the_button" data-onclick="_print_to_terminal()">Print Info Somewhere</button>
+<button data-onclick="_print_to_terminal()">Print Info Somewhere</button>
 <br><br>
 <label>A: </label>
-<input type='text' id="var_a" data-variable="var_a">
+<input type='text' data-variable="var_a">
 <br>
 <label>B: </label>
-<input type='text' id="var_b" data-variable="var_b">
+<input type='text' data-variable="var_b">
 <br><br>
-<!--<div class="barplot" data-variable="barplot_data" style="width:300px; height:300px"></div>-->
+<label>C: </label>
+<input type='text' data-variable="var_c">
+<br><br>
+<div class="barplot" data-variable="barplot_data" style="width:300px; height:300px"></div>
+<div class="barplot" data-variable="barplot_data2" style="width:300px; height:300px"></div>
 
 <!-- span example -->
 The variable num_neurons is equal to <span data-variable="num_neurons"></span>.
 <button data-onclick="print('Do something else')">Click me</button>
 
-<script>
-    // Tell python the relevant variables to update
-    var to_update = [];
-    var browser_id = BROWSER_ID_GOES_HERE;
+<script type="text/javascript">
+var to_update = [];
+var browser_id = BROWSER_ID_GOES_HERE;
 
-    $('[data-variable]').each( function () {
-        to_update.push($(this).attr('data-variable'));
-    });
-    _set_relevant_vars(JSON.stringify([to_update, browser_id]));
+$('[data-variable]').each( function () {
+    to_update.push($(this).attr('data-variable'));
+});
+_set_relevant_vars(JSON.stringify([to_update, browser_id]));
 
-    // update any changed variables sent from python
-    var update_html_variable_displays = function(changed_vars) {
-        $.each(changed_vars[0], function(key, value) {
-            $(`span[data-variable="${key}"]`).text(value);
-            $(`input[data-variable="${key}"]`).val(value);
-            /*$(`div[data-variable="${key}"][class='barplot']`).each( function() {
-                make_barplot(value, "."+key);
-            })*/
+// update any changed variables sent from python
+function update_html_variable_displays(changed_vars) {
+    $.each(changed_vars[0], function(key, value) {
+        $(`span[data-variable="${key}"]`).text(value);
+        $(`input[data-variable="${key}"]`).val(value);
+        $(`div[data-variable="${key}"][class='barplot']`).each( function() {
+            make_barplot(value, this);    // send in this
         });
-        $.each(changed_vars[1], function(index, key) {
-            // deleted variables. individual handling maybe?
-            $(`span[data-variable="${key}"]`).text("");
-            $(`input[data-variable="${key}"]`).val("");
-        });
-    };
-
-    // attach button clicks to correct python functions
-    $('[data-onclick]').click(function() {
-        _py_function_handler($(this).attr('data-onclick'));
     });
-
-    // behavior for all input (could specify to a certain class of inputs if needed)
-    $('input').keypress(function(event){
-        // from https://www.mkyong.com/jquery/how-to-check-if-an-enter-key-is-pressed-with-jquery/
-        var keycode = (event.keyCode ? event.keyCode : event.which);
-        if (keycode == '13'){
-            _update_vars($(this).attr('data-variable'), $(this).val())
-            $(this).blur()
-        }
-        event.stopPropagation()
+    $.each(changed_vars[1], function(index, key) {
+        // deleted variables. individual handling maybe?
+        $(`span[data-variable="${key}"]`).text("");
+        $(`input[data-variable="${key}"]`).val("");
     });
-    $('input').focusout(function() {   // also update if focus is lost on input
+};
+
+// attach button clicks to correct python functions
+$('[data-onclick]').click(function() {
+    _py_function_handler($(this).attr('data-onclick'));
+});
+
+// behavior for all input (could specify to a certain class of inputs if needed)
+$('input').keypress(function(event){
+    // from https://www.mkyong.com/jquery/how-to-check-if-an-enter-key-is-pressed-with-jquery/
+    var keycode = (event.keyCode ? event.keyCode : event.which);
+    if (keycode == '13'){
         _update_vars($(this).attr('data-variable'), $(this).val())
-    });
+        $(this).blur()
+    }
+    event.stopPropagation()
+});
+$('input').focusout(function() {   // also update if focus is lost on input
+    _update_vars($(this).attr('data-variable'), $(this).val())
+});
 
-    function make_barplot(dat, target_class) {
-        return "spam";
-    };
+function make_barplot(dat, object) {
 
+    var div = d3.select(object);
+    // clear a previous plot
+    div.select("svg").remove();
 
+    var w = parseFloat(div.style("width").replace("px", ""));
+    var h = parseFloat(div.style("height").replace("px", ""));
+    var svg = div.append("svg").attr("width", w).attr("height", h);
+
+    var xscale = d3.scaleLinear()
+        .domain([0, dat.length])
+        .range([0, w-(w/dat.length-5)]);
+
+    var yscale = d3.scaleLinear()
+        .domain([d3.min(dat)-1, d3.max(dat)])
+        .range([h, 0]);
+
+    var colorscale = d3.scaleLinear()
+        .domain([d3.min(dat), d3.max(dat)])
+        .range([0, 255]);
+
+    svg.selectAll("rect")
+        .data(dat)
+        .enter()
+        .append("rect")
+        .attr("x", function(d, i) {
+            return xscale(i);
+        })
+        .attr("y", function(d) {
+            return yscale(d);
+        })
+        .attr("width", w/dat.length - 5)
+        .attr("height", function(d) {
+            return h-yscale(d);
+        })
+        .attr("fill", function(d) {
+            return `rgb(0, 0, ${colorscale(d)})`;
+        })
+
+};
 </script>
-
 </body>
 </html>
 

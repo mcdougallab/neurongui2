@@ -1,0 +1,227 @@
+<!-- HTML with embedded script using Jquery and d3, including all necessary functions -->
+
+<!doctype html>
+
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+        <script src="https://d3js.org/d3.v5.min.js"></script>
+    </head>
+<body>
+
+HTML_GOES_HERE
+
+<script type="text/javascript">
+var to_update = [];
+var browser_id = BROWSER_ID_GOES_HERE;
+
+// send request for necessary variables at initialization
+$('[data-variable]').each( function () {
+    to_update.push($(this).attr('data-variable'));
+});
+$('[data-x-var]').each( function() {
+    var x_var = $(this).attr('data-x-var');
+    if (!to_update.includes(x_var)) { 
+        to_update.push(x_var);
+    };
+})
+$('[data-y-var]').each( function() {
+    $.each($(this).attr('data-y-var').split(';'), function(i, yvar) {
+        if (!to_update.includes(yvar)) {
+            to_update.push(yvar);
+        };
+    })
+})
+_set_relevant_vars(JSON.stringify([to_update, browser_id]));
+
+// update any changed variables sent from python
+function update_html_variable_displays(changed, deleted) {
+    $.each(changed, function(key, value) {
+        $(`span[data-variable="${key}"]`).text(value);
+        $(`input[data-variable="${key}"]`).val(value);
+        $(`div[data-variable="${key}"][class='barplot']`).each( function() {
+            make_barplot(value, this);    // send in this
+        });
+    });
+    $.each(deleted, function(index, key) {
+        // deleted variables. individual handling maybe?
+        $(`span[data-variable="${key}"]`).text("");
+        $(`input[data-variable="${key}"]`).val("");
+    });
+    // update multivariable plots
+    $("div[class='lineplot']").each( function () {
+        var x_var = $(this).attr('data-x-var');
+
+        // be careful about when these variables are not in the changed list
+        if (changed.hasOwnProperty(x_var)) {
+            if (!(changed[x_var].length > 0)) {
+                make_lineplot([], this);
+            }
+
+            var y_vars = $(this).attr('data-y-var').split(';');
+            var x_val = changed[x_var]
+            var lineplot_data = [];  
+            if (x_val.length > 0) {
+                $.each(y_vars, function(ind, y) {
+                    if (changed.hasOwnProperty(y)) {
+                        var y_val = changed[y]
+                        lineplot_data.push(x_val.map((k, i) => [k, y_val[i]]));
+                    };
+                    // do something else if one of the y properties hasn't changed? 
+                    // think... what happens if dependent vars get updated at offset times?
+                })
+            }
+
+            if (lineplot_data.length > 0) {
+                make_lineplot(lineplot_data, this);
+            }
+        };
+
+        // reformatted to input to lineplot
+        // [series1, series2, series3]
+        // where series1 = [[x, y1], [x, y1], ...]
+
+    });
+};
+
+// attach button clicks to correct python functions
+$('[data-onclick]').click(function() {
+    _py_function_handler($(this).attr('data-onclick'));
+});
+
+// behavior for all input (could specify to a certain class of inputs if needed)
+$('input').keypress(function(event){
+    // from https://www.mkyong.com/jquery/how-to-check-if-an-enter-key-is-pressed-with-jquery/
+    var keycode = (event.keyCode ? event.keyCode : event.which);
+    if (keycode == '13'){
+        _update_vars($(this).attr('data-variable'), $(this).val())
+        $(this).blur()
+    }
+    event.stopPropagation()
+});
+$('input').focusout(function() {   // also update if focus is lost on input
+    _update_vars($(this).attr('data-variable'), $(this).val())
+});
+
+function make_barplot(dat, object) {
+
+    var div = d3.select(object);
+    // clear a previous plot
+    div.select("svg").remove();
+
+    var w = parseFloat(div.style("width").replace("px", ""));
+    var h = parseFloat(div.style("height").replace("px", ""));
+    var svg = div.append("svg").attr("width", w).attr("height", h);
+
+    var xscale = d3.scaleLinear()
+        .domain([0, dat.length])
+        .range([0, w-(w/dat.length-5)]);
+
+    var yscale = d3.scaleLinear()
+        .domain([d3.min(dat)-1, d3.max(dat)])
+        .range([h, 0]);
+
+    var colorscale = d3.scaleLinear()
+        .domain([d3.min(dat), d3.max(dat)])
+        .range([0, 255]);
+
+    svg.selectAll("rect")
+        .data(dat)
+        .enter()
+        .append("rect")
+        .attr("x", function(d, i) {
+            return xscale(i);
+        })
+        .attr("y", function(d) {
+            return yscale(d);
+        })
+        .attr("width", w/dat.length - 5)
+        .attr("height", function(d) {
+            return h-yscale(d);
+        })
+        .attr("fill", function(d) {
+            return `rgb(0, 0, ${colorscale(d)})`;
+        })
+
+};
+
+function make_lineplot(dat, object) {
+    // have a list (limitless?) to generate different colors depending on number of series to plot
+    // plot each series using a for loop
+    var colorpick = ["blue", "red", "yellow", "green"];
+
+    var div = d3.select(object);
+    // clear a previous plot --- CHANGE THIS
+    div.select("svg").remove();
+
+    var w = parseFloat(div.style("width").replace("px", ""));
+    var h = parseFloat(div.style("height").replace("px", ""));
+    var margin = 50;
+
+    var svg = div.append("svg").attr("width", w).attr("height", h);
+
+    $.each(dat, function(index, k) {  // go through each series
+        var series_dat = k;
+        var series_color = colorpick[index];
+
+        var tmin = d3.min(series_dat, function(d) {return d[0]});
+        var tmax = d3.max(series_dat, function(d) {return d[0]});
+        var ymin = d3.min(series_dat, function(d) {return d[1]});
+        var ymax = d3.max(series_dat, function(d) {return d[1]});
+
+        var xscale = d3.scaleLinear()
+        .domain([tmin, tmax])
+        .range([margin, w-margin]);
+
+        var yscale = d3.scaleLinear()
+        .domain([ymin-10, ymax+10])
+        .range([h-margin, margin]);
+
+        svg.append("path")
+            .datum(series_dat)
+            .attr("fill", "none")
+            .attr("stroke", "steelblue")
+            .attr("stroke-width", 1.5)
+            .attr("d", d3.line()
+                .x(function(d) {return xscale(d[0]);})
+                .y(function(d) {return yscale(d[1]);}));
+
+
+        svg.append("g")
+            .attr("class", "axis")
+            .attr("transform", `translate(${margin},0)`)
+            .call(d3.axisLeft()
+                .scale(yscale));
+        svg.append("g")
+            .attr("class", "axis")
+            .attr("transform", `translate(0,${h-margin})`)
+            .call(d3.axisBottom()
+                .scale(xscale));
+        svg.append("text")
+            .attr("x", xscale(tmax-0.5*(tmax-tmin)))
+            .attr("y", h-margin*0.3)
+            .text("time (ms)")
+            .attr("text-anchor", "middle")
+            .attr("font-size", "16px");
+        svg.append("text")
+            .attr("x", margin*0.3)
+            .attr("y", yscale(ymax - 0.5*(ymax-ymin)))
+            .attr("transform", `rotate(-90,${margin*0.3},${yscale(ymax-0.5*(ymax-ymin))})`)
+            .text("voltage (mV)")
+            .attr("text-anchor", "middle")
+            .attr("font-size", "16px");
+
+    });
+
+};
+
+</script>
+</body>
+</html>
+
+
+
+
+
+

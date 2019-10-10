@@ -13,7 +13,10 @@ import time
 import json
 import copy
 from weakref import WeakValueDictionary
-from neuron import h
+from neuron import h, nrn_dll_sym
+from neuron.units import ms, mV
+
+h.load_file('stdrun.hoc')
 
 # Platforms
 WINDOWS = (platform.system() == "Windows")
@@ -57,9 +60,6 @@ def html_to_data_uri(html, browser_id, js_callback=None):
         js_callback.Call(ret)
     else:
         return ret
-
-with open('simple.html') as f:
-    my_html = f.read()
 
 def main():
     check_versions()
@@ -111,8 +111,16 @@ def scale_window_size_for_high_dpi(width, height):
 
 class MainFrame(wx.Frame):
 
-    def __init__(self):
+    def __init__(self, html_file):
         self.browser = None
+        self.html_file = html_file
+
+        with open(html_file) as f:
+            my_html = f.read()
+        with open("main_script.html") as f:
+            my_wrapper_html = f.read()
+
+        self.wrapper_html = my_wrapper_html.replace("HTML_GOES_HERE", my_html)
 
         # Must ignore X11 errors like 'BadWindow' and others by
         # installing X11 error handlers. This must be done after
@@ -188,7 +196,7 @@ class MainFrame(wx.Frame):
         window_info.SetAsChild(self.browser_panel.GetHandle(),
                                [0, 0, width, height])
         self.browser = cef.CreateBrowserSync(window_info,
-                                             url=html_to_data_uri(my_html, self.browser_id))
+                                             url=html_to_data_uri(self.wrapper_html, self.browser_id))
         self.set_browser_callbacks()
         self.browser.SetClientHandler(FocusHandler())
         browser_weakvaldict[self.browser_id] = self # create mapping to frame object in weak value dict
@@ -324,10 +332,10 @@ def make_terminal():
     #shell.write("Type make_terminal() or make_browser() or quit()\n")
     window.Show(True) 
 
-def make_browser():
+def make_browser(html_file="test_elements.html"):
     global browser_created_count
     browser_created_count += 1
-    frame = MainFrame()
+    frame = MainFrame(html_file)
     frame.Show()
     _all_windows.append(frame)
     return frame
@@ -370,17 +378,19 @@ def _py_function_handler(function_string):
 
 def _update_vars(variable, value):
     # update any variables sent in by the browser
-    if variable == 'var_a':
-            shared_locals['var_a'] = float(value)
-    elif variable == 'var_b':
-            shared_locals['var_b'] = float(value)
-    else:
+    if value == '':
+        value = None
+    elif shared_locals.get(variable) == None:
         print('unknown variable: ', variable)
+    else:
+        shared_locals[variable] = float(value)
+    # for more complex version will need to be more careful assigning updated values
 
 def _set_relevant_vars(to_update):
     global rel_vars, browser_weakvaldict
     # receive JS declaration of relevant variables
     rel_vars, browser_id = json.loads(to_update)
+    print(rel_vars)
     # send variable values to browser as needed
     browser_weakvaldict[browser_id].monitor_loop = monitor_browser_vars(browser_weakvaldict[browser_id].browser)
 
@@ -395,8 +405,11 @@ def find_changed_vars(old_copy, new_locals):
         if (new_locals.get(v) == None) and (v in old_copy.keys()):
             deleted.append(v)
         elif new_locals.get(v) != old_copy.get(v):
-            changed[v] = new_locals.get(v)
-
+            current = new_locals.get(v)
+            if isinstance(current, list):
+                changed[v] = copy.copy(current)
+            else:
+                changed[v] = current
     return [changed, deleted]
 
 def _update_browser_vars(browser, locals_copy):  
@@ -409,11 +422,49 @@ def _update_browser_vars(browser, locals_copy):
     # handle deletions separately 
     for d in deleted_vars:
         del locals_copy[d]
-    # now update the displays of any changed variables
-    browser.ExecuteJavascript("update_html_variable_displays({})".format(json.dumps([changed_vars, deleted_vars])))
+    # to include check (in JS): if v_data and t_data and len(v_data) == len(t_data)
+    # update the changed variables for javascript
+    if changed_vars or deleted_vars:
+        print(changed_vars.keys())
+        browser.ExecuteJavascript("update_html_variable_displays({}, {})".format(json.dumps(changed_vars), json.dumps(deleted_vars)))
+
+def _run_simulation():
+    # create new soma object every simulation
+    soma = h.Section(name='soma')
+    soma.insert('hh')
+    soma.L = soma.diam = 10
+    ic = h.IClamp(soma(0.5))
+
+    # read updated settings
+    ic.amp = shared_locals['start_amp']
+    ic.dur = shared_locals['start_dur']
+    ic.delay = shared_locals['start_delay']
+    tstop = shared_locals['runtime'] * ms
+    init_v = shared_locals['init_v']
+
+    # check that there is a value for every setting
+    for i in [ic.amp, ic.dur, ic.delay, tstop, init_v]:
+        if i == None:
+            print("Not all simulation data entered") # change this to sending a popup in browser
+
+    # run and record sim data
+    v = h.Vector().record(soma(0.5)._ref_v)
+    t = h.Vector().record(h._ref_t)
+
+    h.finitialize(init_v * mV)
+    h.continuerun(tstop)
+
+    # send the results
+    shared_locals['v_data'] = list(v)
+    shared_locals['t_data'] = list(t)
+
+def _save_sim_data():
+    pass
 
 shared_locals = {'make_terminal': make_terminal, 'make_browser': make_browser, 'quit': sys.exit, 'delete_var':delete_var,
-'var_a':1, 'var_b':42, 'num_neurons':5, 'barplot_data':[1,2,3,4,5], 'sec':h.Section(name='sec'), 'weakdict':browser_weakvaldict}
+'var_a':1, 'var_b':42, 'num_neurons':5, 'barplot_data':[1,2,3,4,5], 'weakdict':browser_weakvaldict, 
+'sim': lambda: make_browser("simulation1.html"), 'start_amp': 1, 'start_delay': 0.5, 'start_dur':0.1, 'init_v': -65, 'runtime': 5,
+'v_data': [], 't_data': []}
 
 rel_vars = []
 
