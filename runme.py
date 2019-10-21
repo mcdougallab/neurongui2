@@ -43,6 +43,14 @@ g_count_windows = 0
 browser_created_count = 0   #for the weak value dict of browsers
 browser_weakvaldict = WeakValueDictionary()
 
+# for tracking initializing simulations
+def finit_handler():
+    global FIH
+    FIH = 1
+fih = h.FInitializeHandler(finit_handler)
+FIH = 0
+t_tracker = h.t
+
 def html_to_data_uri(html, browser_id, js_callback=None):
     # This function is called in two ways:
     # 1. From Python: in this case value is returned
@@ -111,9 +119,12 @@ def scale_window_size_for_high_dpi(width, height):
 
 class MainFrame(wx.Frame):
 
-    def __init__(self, html_file):
+    def __init__(self, html_file, user_mappings):
         self.browser = None
         self.html_file = html_file
+        self.user_mappings = user_mappings
+        self.rel_vars = []
+        self.graph_vars = {}
 
         with open(html_file) as f:
             my_html = f.read()
@@ -134,7 +145,7 @@ class MainFrame(wx.Frame):
         size = scale_window_size_for_high_dpi(WIDTH, HEIGHT)
 
         wx.Frame.__init__(self, parent=None, id=wx.ID_ANY,
-                          title='a browser window!', size=size)
+                          title='Simulation Window', size=size)
 
         self.setup_icon()
         self.create_menu()
@@ -332,10 +343,10 @@ def make_terminal():
     #shell.write("Type make_terminal() or make_browser() or quit()\n")
     window.Show(True) 
 
-def make_browser(html_file="test_elements.html"):
+def make_browser(html_file, user_mappings):
     global browser_created_count
     browser_created_count += 1
-    frame = MainFrame(html_file)
+    frame = MainFrame(html_file, user_mappings)
     frame.Show()
     _all_windows.append(frame)
     return frame
@@ -363,9 +374,9 @@ class LoopTimer(threading.Thread) :
       self.fun(*self.param)
       time.sleep(self.interval)
 
-def monitor_browser_vars(browser):
+def monitor_browser_vars(browser_id):
     locals_copy = {} # initiate but don't know rel_vars yet
-    timer = LoopTimer(0.1, _update_browser_vars, browser, locals_copy)
+    timer = LoopTimer(0.1, _update_browser_vars, browser_id, locals_copy)
     timer.start()
     return timer
 
@@ -373,100 +384,139 @@ def _print_to_terminal():
     # experimental info relayed to terminal from browser action
     print("So this worked.")
 
-def _py_function_handler(function_string):
-    exec(function_string)
+def _py_function_handler(browser_id, function_string):
+    global browser_weakvaldict 
+    # first check user mappings then shared_locals for the function
+    exec(function_string, shared_locals, browser_weakvaldict[browser_id].user_mappings)
 
-def _update_vars(variable, value):
+def lookup(browser_id, variable, action, newValue=None):
+    global browser_weakvaldict
+    mappings =  browser_weakvaldict[browser_id].user_mappings
+    # repeated process to check for a variable in a particular browser's mappings and then shared_locals
+    # action can be "get" or "set"; newValue is value to set
+    split = variable.split('.')
+    if len(split) == 1:
+        # single variable
+        if variable in mappings.keys():
+            if action == "get":
+                return mappings.get(variable)
+            elif action =="set":
+                mappings[variable] = newValue
+        elif variable in shared_locals.keys():
+            if action == "get":
+                return shared_locals.get(variable)
+            elif action == "set":
+                shared_locals[variable] = newValue
+        else:
+            print("unknown variable: ", variable)
+            return None
+    else:
+        # if it's an attribute of an object
+        obj, attribute = split
+        if obj in mappings.keys():
+            if action == "get":
+                return getattr(mappings[obj], attribute)
+            elif action == "set":
+                setattr(mappings[obj], attribute, newValue)
+        elif obj in shared_locals.keys():
+            if action == "get":
+                return getattr(shared_locals[obj], attribute)
+            elif action == "set":
+                setattr(shared_locals[obj], attribute, newValue)
+        else:
+            print("unknown variable: ", variable)
+            return None
+
+def lookup_graph_var(browser_id, variable):
+    # specifically for graph vector variables; only to retrieve
+    # _ref_ attributes
+    global browser_weakvaldict
+    graph_vars = browser_weakvaldict[browser_id].graph_vars
+    mappings = browser_weakvaldict[browser_id].user_mappings
+    obj, attribute = variable.split('.')
+    if obj in mappings.keys():
+        return getattr(mappings[obj], "_ref_"+attribute)
+    elif obj in shared_locals.keys():
+        return getattr(shared_locals[obj], "_ref_"+attribute)
+    else:
+        print("unknown variable: ", variable)
+        return None
+
+def _update_vars(browser_id, variable, value):
     # update any variables sent in by the browser
+    #TODO: consider; # can this lead to discrepancies betw shared_locals and user_mappings?
     if value == '':
         value = None
-    elif shared_locals.get(variable) == None:
-        print('unknown variable: ', variable)
-    else:
-        shared_locals[variable] = float(value)
-    # for more complex version will need to be more careful assigning updated values
+    lookup(browser_id, variable, "set", float(value))
 
 def _set_relevant_vars(to_update):
-    global rel_vars, browser_weakvaldict
+    global browser_weakvaldict
     # receive JS declaration of relevant variables
-    rel_vars, browser_id = json.loads(to_update)
-    print(rel_vars)
-    # send variable values to browser as needed
-    browser_weakvaldict[browser_id].monitor_loop = monitor_browser_vars(browser_weakvaldict[browser_id].browser)
+    rel_vars, graph_vars, browser_id = json.loads(to_update)
+    this_browser = browser_weakvaldict[browser_id]
+
+    this_browser.rel_vars = rel_vars
+    for g_var in graph_vars:
+        # set up recording graph vector variables
+        this_browser.graph_vars[g_var] = h.Vector().record(lookup_graph_var(browser_id, g_var))
+
+    this_browser.monitor_loop = monitor_browser_vars(browser_id)
+    
 
 def delete_var(v):
     del shared_locals[v]
 
-def find_changed_vars(old_copy, new_locals):
+def find_changed_vars(browser_id, old_copy):
+    global browser_weakvaldict
+    this_browser = browser_weakvaldict[browser_id]
     # input is copy of relevant variable dict and latest shared_locals; find which are changed or deleted
     changed = {}
     deleted = []
+    rel_vars = this_browser.rel_vars
     for v in rel_vars:
-        if (new_locals.get(v) == None) and (v in old_copy.keys()):
+        current = lookup(browser_id, v, "get")
+        if (current == None) and (v in old_copy.keys()):
             deleted.append(v)
-        elif new_locals.get(v) != old_copy.get(v):
-            current = new_locals.get(v)
+        elif current != old_copy.get(v):
             if isinstance(current, list):
                 changed[v] = copy.copy(current)
             else:
                 changed[v] = current
     return [changed, deleted]
 
-def _update_browser_vars(browser, locals_copy):  
-    # currently are not dealing with hasFocus in this way
-    #browser.ExecuteJavascript("if ((document.getElementById('var_a') != document.activeElement) || !(document.hasFocus())) {document.getElementById('var_a').value = " + str(shared_locals['var_a']) + "}")
-    #browser.ExecuteJavascript("if ((document.getElementById('var_b') != document.activeElement) || !(document.hasFocus())) {document.getElementById('var_b').value = " + str(shared_locals['var_b']) + "}")
+def send_graph_vars(browser_id, graph_vars):
+    global browser_weakvaldict
+    this_browser = browser_weakvaldict[browser_id]
+    g_vars = {}
+    for k in graph_vars.keys():
+        g_vars[k] = list(graph_vars[k])
+    this_browser.browser.ExecuteJavascript("update_graph_vectors({})".format(json.dumps(g_vars)))
+
+def _update_browser_vars(browser_id, locals_copy):  
+    global FIH, t_tracker, browser_weakvaldict
+    this_browser = browser_weakvaldict[browser_id]
     # create dictionary of the changed variables 
-    changed_vars, deleted_vars = find_changed_vars(locals_copy, shared_locals)
+    changed_vars, deleted_vars = find_changed_vars(browser_id, locals_copy)
     locals_copy.update(changed_vars)
     # handle deletions separately 
     for d in deleted_vars:
         del locals_copy[d]
-    # to include check (in JS): if v_data and t_data and len(v_data) == len(t_data)
     # update the changed variables for javascript
     if changed_vars or deleted_vars:
-        print(changed_vars.keys())
-        browser.ExecuteJavascript("update_html_variable_displays({}, {})".format(json.dumps(changed_vars), json.dumps(deleted_vars)))
+        this_browser.browser.ExecuteJavascript("update_html_variable_displays({}, {})".format(json.dumps(changed_vars), json.dumps(deleted_vars)))
+    # handle graph vectors - send if finitialize has been called or h.t has changed
+    graph_vars = this_browser.graph_vars
+    if FIH == 1:
+        send_graph_vars(browser_id, graph_vars)
+        FIH = 0
+    elif h.t != t_tracker:
+        send_graph_vars(browser_id, graph_vars)
 
-def _run_simulation():
-    # create new soma object every simulation
-    soma = h.Section(name='soma')
-    soma.insert('hh')
-    soma.L = soma.diam = 10
-    ic = h.IClamp(soma(0.5))
-
-    # read updated settings
-    ic.amp = shared_locals['start_amp']
-    ic.dur = shared_locals['start_dur']
-    ic.delay = shared_locals['start_delay']
-    tstop = shared_locals['runtime'] * ms
-    init_v = shared_locals['init_v']
-
-    # check that there is a value for every setting
-    for i in [ic.amp, ic.dur, ic.delay, tstop, init_v]:
-        if i == None:
-            print("Not all simulation data entered") # change this to sending a popup in browser
-
-    # run and record sim data
-    v = h.Vector().record(soma(0.5)._ref_v)
-    t = h.Vector().record(h._ref_t)
-
-    h.finitialize(init_v * mV)
-    h.continuerun(tstop)
-
-    # send the results
-    shared_locals['v_data'] = list(v)
-    shared_locals['t_data'] = list(t)
-
-def _save_sim_data():
-    pass
+def setupSim():
+    shared_locals['shell'].runfile('setup.txt')
 
 shared_locals = {'make_terminal': make_terminal, 'make_browser': make_browser, 'quit': sys.exit, 'delete_var':delete_var,
-'var_a':1, 'var_b':42, 'num_neurons':5, 'barplot_data':[1,2,3,4,5], 'weakdict':browser_weakvaldict, 
-'sim': lambda: make_browser("simulation1.html"), 'start_amp': 1, 'start_delay': 0.5, 'start_dur':0.1, 'init_v': -65, 'runtime': 5,
-'v_data': [], 't_data': []}
-
-rel_vars = []
+'weakdict':browser_weakvaldict, 'sim': lambda: make_browser("simulation1.html"), 'setupSim':setupSim}
 
 if __name__ == '__main__':
     main()

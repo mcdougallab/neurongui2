@@ -1,5 +1,8 @@
 
 <style>
+    body {
+        background-color: #f2f3f4;
+    }
     #inp_fields {
         margin: 50px;
         float: left;
@@ -14,6 +17,7 @@
         border: 2px solid black;
         float: left;
         padding: 10px;
+        background-color: white;
     }
     div.inputs {
         display: grid;
@@ -29,7 +33,8 @@
         text-align: center;
         width: 50%;
         float: left;
-        background-color: lightcyan;
+        color: white;
+        background-color: #341575;
     }
 </style>
 
@@ -38,32 +43,32 @@
 <h1>Current Injection</h1>
 <div class="inputs">
     <label>Amplitude: </label>
-    <input type="number" min="0" data-variable="start_amp"><label> nA </label>
+    <input type="number" min="0" data-variable="ic.amp"><label> nA </label>
 
     <label>Starting Delay: </label>
-    <input type="number" min="0" step="0.1" data-variable="start_delay"><label> ms </label>
+    <input type="number" min="0" step="0.1" data-variable="ic.del"><label> ms </label>
 
     <label>Duration: </label>
-    <input type="number" min="0" step="0.1" data-variable="start_dur"><label> ms </label>
+    <input type="number" min="0" step="0.1" data-variable="ic.dur"><label> ms </label>
 </div>
 
 <h1>Simulation</h1>
 <div class="inputs">
     <label>Initial Voltage: </label>
-    <input type="number" data-variable="init_v"><label> mV </label>
+    <input type="number" data-variable="vinit"><label> mV </label>
 
     <label>Run Time: </label>
-    <input type="number" min="0" data-variable="runtime"><label> ms </label>
+    <input type="number" min="0" data-variable="tstop"><label> ms </label>
 </div>
 
 <div class="buttons">
-<button data-onclick="_run_simulation()">GO</button>
+<button data-onclick="go()">GO</button>
 <button data-onclick="_save_sim_data()">Save Data</button>
 </div>
 
 </div>
 
-<div class="lineplot" data-x-var="t_data" data-y-var="v_data" style="margin-top:50px; width:400px; height:400px"></div>
+<div class="lineplot" data-x-var="h.t" data-y-var="seg.v" style="margin-top:50px; width:400px; height:400px"></div>
 
 
 

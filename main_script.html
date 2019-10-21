@@ -14,6 +14,7 @@ HTML_GOES_HERE
 
 <script type="text/javascript">
 var to_update = [];
+var graph_vars = [];
 var browser_id = BROWSER_ID_GOES_HERE;
 
 // send request for necessary variables at initialization
@@ -22,18 +23,18 @@ $('[data-variable]').each( function () {
 });
 $('[data-x-var]').each( function() {
     var x_var = $(this).attr('data-x-var');
-    if (!to_update.includes(x_var)) { 
-        to_update.push(x_var);
+    if (!graph_vars.includes(x_var)) { 
+        graph_vars.push(x_var);
     };
 })
 $('[data-y-var]').each( function() {
     $.each($(this).attr('data-y-var').split(';'), function(i, yvar) {
-        if (!to_update.includes(yvar)) {
-            to_update.push(yvar);
+        if (!graph_vars.includes(yvar)) {
+            graph_vars.push(yvar);
         };
     })
 })
-_set_relevant_vars(JSON.stringify([to_update, browser_id]));
+_set_relevant_vars(JSON.stringify([to_update, graph_vars, browser_id]));
 
 // update any changed variables sent from python
 function update_html_variable_displays(changed, deleted) {
@@ -49,34 +50,31 @@ function update_html_variable_displays(changed, deleted) {
         $(`span[data-variable="${key}"]`).text("");
         $(`input[data-variable="${key}"]`).val("");
     });
+}
+
+function update_graph_vectors(graph_vars) {
     // update multivariable plots
+    // assumes that vars have only been sent if all vectors have changed or been reinitialized
     $("div[class='lineplot']").each( function () {
         var x_var = $(this).attr('data-x-var');
 
-        // be careful about when these variables are not in the changed list
-        if (changed.hasOwnProperty(x_var)) {
-            if (!(changed[x_var].length > 0)) {
-                make_lineplot([], this);
-            }
+        if (!(graph_vars[x_var].length > 0)) {
+            make_lineplot([], this);
+        }
 
-            var y_vars = $(this).attr('data-y-var').split(';');
-            var x_val = changed[x_var]
-            var lineplot_data = [];  
-            if (x_val.length > 0) {
-                $.each(y_vars, function(ind, y) {
-                    if (changed.hasOwnProperty(y)) {
-                        var y_val = changed[y]
-                        lineplot_data.push(x_val.map((k, i) => [k, y_val[i]]));
-                    };
-                    // do something else if one of the y properties hasn't changed? 
-                    // think... what happens if dependent vars get updated at offset times?
-                })
-            }
+        var y_vars = $(this).attr('data-y-var').split(';');
+        var x_val = graph_vars[x_var]
+        var lineplot_data = [];  
+        if (x_val.length > 0) {
+            $.each(y_vars, function(ind, y) {
+                var y_val = graph_vars[y]
+                lineplot_data.push(x_val.map((k, i) => [k, y_val[i]]));
+            })
+        }
 
-            if (lineplot_data.length > 0) {
-                make_lineplot(lineplot_data, this);
-            }
-        };
+        if (lineplot_data.length > 0) {
+            make_lineplot(lineplot_data, this);
+        }
 
         // reformatted to input to lineplot
         // [series1, series2, series3]
@@ -87,7 +85,7 @@ function update_html_variable_displays(changed, deleted) {
 
 // attach button clicks to correct python functions
 $('[data-onclick]').click(function() {
-    _py_function_handler($(this).attr('data-onclick'));
+    _py_function_handler(browser_id, $(this).attr('data-onclick'));
 });
 
 // behavior for all input (could specify to a certain class of inputs if needed)
@@ -95,13 +93,13 @@ $('input').keypress(function(event){
     // from https://www.mkyong.com/jquery/how-to-check-if-an-enter-key-is-pressed-with-jquery/
     var keycode = (event.keyCode ? event.keyCode : event.which);
     if (keycode == '13'){
-        _update_vars($(this).attr('data-variable'), $(this).val())
+        _update_vars(browser_id, $(this).attr('data-variable'), $(this).val())
         $(this).blur()
     }
     event.stopPropagation()
 });
 $('input').focusout(function() {   // also update if focus is lost on input
-    _update_vars($(this).attr('data-variable'), $(this).val())
+    _update_vars(browser_id, $(this).attr('data-variable'), $(this).val())
 });
 
 function make_barplot(dat, object) {
@@ -153,6 +151,7 @@ function make_lineplot(dat, object) {
 
     var div = d3.select(object);
     // clear a previous plot --- CHANGE THIS
+    // TODO: only clear if dat is empty; otherwise only update the lineplot data with changed values
     div.select("svg").remove();
 
     var w = parseFloat(div.style("width").replace("px", ""));
@@ -172,11 +171,11 @@ function make_lineplot(dat, object) {
 
         var xscale = d3.scaleLinear()
         .domain([tmin, tmax])
-        .range([margin, w-margin]);
+        .range([margin, w-margin/2]);
 
         var yscale = d3.scaleLinear()
         .domain([ymin-10, ymax+10])
-        .range([h-margin, margin]);
+        .range([h-margin, margin/2]);
 
         svg.append("path")
             .datum(series_dat)
@@ -186,7 +185,6 @@ function make_lineplot(dat, object) {
             .attr("d", d3.line()
                 .x(function(d) {return xscale(d[0]);})
                 .y(function(d) {return yscale(d[1]);}));
-
 
         svg.append("g")
             .attr("class", "axis")
