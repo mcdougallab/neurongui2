@@ -124,9 +124,12 @@ class MainFrame(wx.Frame):
         self.html_file = html_file
         self.user_mappings = user_mappings
         self.rel_vars = []
-        self.graph_vars = {}
-        self.fih = 0
-        self.t_tracker = 0
+        self.graph_vars = {}    # graph vector dictionary
+        self.fih = 0    # tracker for whether fInitialize has happened
+        self.t_tracker = 0  #tracker for length of time (or other) vector
+        self.ready_status = 1   #browser sends signal that it's ready when done updating graphs
+        self.data_waiting = None    #graph data waiting for browser to be ready
+        self.t_tracker_vec = "h.t"  #which vector to use for graph tracking
 
         with open(html_file) as f:
             my_html = f.read()
@@ -220,6 +223,7 @@ class MainFrame(wx.Frame):
         self.bindings.SetFunction("_update_vars", _update_vars)
         self.bindings.SetFunction("_py_function_handler", _py_function_handler)
         self.bindings.SetFunction("_set_relevant_vars", _set_relevant_vars)
+        self.bindings.SetFunction("_flag_browser_ready", _flag_browser_ready)
         self.browser.SetJavascriptBindings(self.bindings)
 
     def OnSetFocus(self, _):
@@ -391,6 +395,10 @@ def _py_function_handler(browser_id, function_string):
     # first check user mappings then shared_locals for the function
     exec(function_string, shared_locals, browser_weakvaldict[browser_id].user_mappings)
 
+def _flag_browser_ready(browser_id):
+    global browser_weakvaldict
+    browser_weakvaldict[browser_id].ready_status = 1
+
 def lookup(this_browser, variable, action, newValue=None):
     mappings =  this_browser.user_mappings
     # repeated process to check for a variable in a particular browser's mappings and then shared_locals
@@ -461,11 +469,13 @@ def _set_relevant_vars(to_update):
         this_browser.graph_vars[g_var] = h.Vector().record(lookup_graph_var(this_browser, g_var))
 
     # tracking data changing for graphs
-    t_vec = this_browser.graph_vars.get("h.t")
-    if t_vec:
-        this_browser.t_tracker = len(t_vec) #or, just keep initialized to zero?
-    else:
-        this_browser.t_tracker = h.t  #is this necessary?
+    if graph_vars:  # if there are any graphs, keep track
+        t_vec = this_browser.graph_vars.get("h.t")
+        if t_vec:
+            this_browser.t_tracker = len(t_vec) # or just initialize to zero?
+        else:
+            this_browser.t_tracker = len(this_browser.graph_vars.get(graph_vars[0]))  #use whatever is the first vector; length is still time
+            this_browser.t_tracker_vec = graph_vars[0]
 
     this_browser.monitor_loop = monitor_browser_vars(this_browser)
     
@@ -506,16 +516,28 @@ def _update_browser_vars(this_browser, locals_copy):
     # update the changed variables for javascript
     if changed_vars or deleted_vars:
         this_browser.browser.ExecuteJavascript("update_html_variable_displays({}, {})".format(json.dumps(changed_vars), json.dumps(deleted_vars)))
-    # handle graph vectors - send if finitialize has been called or h.t has changed
-    current_lengthT = len(this_browser.graph_vars.get("h.t"))
-    if this_browser.fih == 1:
-        send_graph_vars(this_browser)
-        this_browser.fih = 0
-        this_browser.t_tracker = current_lengthT
-        #TODO handle if no graphs.  if it matters: handle if there are graphs, but no graph with h.t
-    elif current_lengthT != this_browser.t_tracker:
-        send_graph_vars(this_browser)
-        this_browser.t_tracker = current_lengthT
+    # handle graph vectors - if browser ready and there are graphs
+    if this_browser.graph_vars:
+        if this_browser.data_waiting is not None:
+            # this is mostly a placeholder; will have to change when sending ONLY new data
+            this_browser.ready_status = 0
+            send_graph_vars(this_browser)
+            this_browser.data_waiting = None
+        if this_browser.ready_status == 1:
+            #send if finitialize has been called or h.t has changed
+            current_lengthT = len(this_browser.graph_vars.get(this_browser.t_tracker_vec))
+            if this_browser.fih == 1:
+                this_browser.ready_status = 0
+                send_graph_vars(this_browser)
+                this_browser.fih = 0
+                this_browser.t_tracker = current_lengthT
+            elif current_lengthT != this_browser.t_tracker:
+                this_browser.ready_status = 0
+                send_graph_vars(this_browser)
+                this_browser.t_tracker = current_lengthT
+        else:
+            this_browser.data_waiting = this_browser.graph_vars
+
 def setupSim():
     shared_locals['shell'].runfile('setup.txt')
 

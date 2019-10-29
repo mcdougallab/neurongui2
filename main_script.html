@@ -17,6 +17,27 @@ var to_update = [];
 var graph_vars = [];
 var browser_id = BROWSER_ID_GOES_HERE;
 
+// min and max functions so large arrays don't crash
+function arrayMin(arr) {
+    min = arr[0];
+    for (i = 1; i < arr.length; i++) {
+        if (arr[i] < min) {
+            min = arr[i];
+        }
+    }
+    return min;
+}
+
+function arrayMax(arr) {
+    max = arr[0];
+    for (i = 1; i < arr.length; i++) {
+        if (arr[i] > max) {
+            max = arr[i];
+        }
+    }
+    return max;
+}
+
 // send request for necessary variables at initialization
 $('[data-variable]').each( function () {
     to_update.push($(this).attr('data-variable'));
@@ -57,7 +78,7 @@ function update_graph_vectors(graph_vars) {
     // assumes that vars have only been sent if all vectors have changed or been reinitialized
     $("div[class='lineplot']").each( function () {
         var x_var = $(this).attr('data-x-var');
-        //console.log(graph_vars[x_var].length);
+        console.log(graph_vars[x_var].length);
         if (graph_vars[x_var].length == 0) {
             make_lineplot([], this);
         }
@@ -70,20 +91,21 @@ function update_graph_vectors(graph_vars) {
         if (x_val.length > 0) {
             $.each(y_vars, function (ind, y) {
                 var y_val = graph_vars[y]
-                ymins.push(Math.min(...y_val));
-                ymaxs.push(Math.max(...y_val));
+                ymins.push(arrayMin(y_val));
+                ymaxs.push(arrayMax(y_val));
                 if (x_val.length <= y_val.length) { // ensures that mapping will go smoothly
-                    lineplot_data[y] = x_val.map((k, i) => [k, y_val[i]]); 
+                    lineplot_data[y] = x_val.map((k, i) => [k, y_val[i]]);
                 }
             })
         }
-        var dimensions = [Math.min(...x_val), Math.max(...x_val), Math.min(...ymins), Math.max(...ymaxs)]; 
+        var dimensions = [arrayMin(x_val), arrayMax(x_val), arrayMin(ymins), arrayMax(ymaxs)]; 
         if (lineplot_data) {
             make_lineplot(lineplot_data, this, dimensions);
+            // reformatted to input to lineplot
+            // {"1": series1, "2": series2, "3": series3}
+            // where series1 = [[x, y1], [x, y1], ...]
         }
-        // reformatted to input to lineplot
-        // {"1": series1, "2": series2, "3": series3}
-        // where series1 = [[x, y1], [x, y1], ...]
+        _flag_browser_ready(browser_id);
     });
 };
 
