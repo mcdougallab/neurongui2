@@ -45,11 +45,11 @@ browser_weakvaldict = WeakValueDictionary()
 
 # for tracking initializing simulations
 def finit_handler():
-    global FIH
-    FIH = 1
-fih = h.FInitializeHandler(finit_handler)
-FIH = 0
-t_tracker = h.t
+    global browser_weakvaldict
+    for b in browser_weakvaldict.values():
+        b.fih = 1
+
+FIH = h.FInitializeHandler(finit_handler)
 
 def html_to_data_uri(html, browser_id, js_callback=None):
     # This function is called in two ways:
@@ -125,6 +125,8 @@ class MainFrame(wx.Frame):
         self.user_mappings = user_mappings
         self.rel_vars = []
         self.graph_vars = {}
+        self.fih = 0
+        self.t_tracker = 0
 
         with open(html_file) as f:
             my_html = f.read()
@@ -374,9 +376,9 @@ class LoopTimer(threading.Thread) :
       self.fun(*self.param)
       time.sleep(self.interval)
 
-def monitor_browser_vars(browser_id):
+def monitor_browser_vars(this_browser):
     locals_copy = {} # initiate but don't know rel_vars yet
-    timer = LoopTimer(0.1, _update_browser_vars, browser_id, locals_copy)
+    timer = LoopTimer(0.1, _update_browser_vars, this_browser, locals_copy)
     timer.start()
     return timer
 
@@ -389,9 +391,8 @@ def _py_function_handler(browser_id, function_string):
     # first check user mappings then shared_locals for the function
     exec(function_string, shared_locals, browser_weakvaldict[browser_id].user_mappings)
 
-def lookup(browser_id, variable, action, newValue=None):
-    global browser_weakvaldict
-    mappings =  browser_weakvaldict[browser_id].user_mappings
+def lookup(this_browser, variable, action, newValue=None):
+    mappings =  this_browser.user_mappings
     # repeated process to check for a variable in a particular browser's mappings and then shared_locals
     # action can be "get" or "set"; newValue is value to set
     split = variable.split('.')
@@ -427,12 +428,10 @@ def lookup(browser_id, variable, action, newValue=None):
             print("unknown variable: ", variable)
             return None
 
-def lookup_graph_var(browser_id, variable):
+def lookup_graph_var(this_browser, variable):
     # specifically for graph vector variables; only to retrieve
     # _ref_ attributes
-    global browser_weakvaldict
-    graph_vars = browser_weakvaldict[browser_id].graph_vars
-    mappings = browser_weakvaldict[browser_id].user_mappings
+    mappings = this_browser.user_mappings
     obj, attribute = variable.split('.')
     if obj in mappings.keys():
         return getattr(mappings[obj], "_ref_"+attribute)
@@ -443,11 +442,12 @@ def lookup_graph_var(browser_id, variable):
         return None
 
 def _update_vars(browser_id, variable, value):
+    global browser_weakvaldict
     # update any variables sent in by the browser
     #TODO: consider; # can this lead to discrepancies betw shared_locals and user_mappings?
     if value == '':
         value = None
-    lookup(browser_id, variable, "set", float(value))
+    lookup(browser_weakvaldict[browser_id], variable, "set", float(value))
 
 def _set_relevant_vars(to_update):
     global browser_weakvaldict
@@ -458,24 +458,29 @@ def _set_relevant_vars(to_update):
     this_browser.rel_vars = rel_vars
     for g_var in graph_vars:
         # set up recording graph vector variables
-        this_browser.graph_vars[g_var] = h.Vector().record(lookup_graph_var(browser_id, g_var))
+        this_browser.graph_vars[g_var] = h.Vector().record(lookup_graph_var(this_browser, g_var))
 
-    this_browser.monitor_loop = monitor_browser_vars(browser_id)
+    # tracking data changing for graphs
+    t_vec = this_browser.graph_vars.get("h.t")
+    if t_vec:
+        this_browser.t_tracker = len(t_vec) #or, just keep initialized to zero?
+    else:
+        this_browser.t_tracker = h.t  #is this necessary?
+
+    this_browser.monitor_loop = monitor_browser_vars(this_browser)
     
 
 def delete_var(v):
     del shared_locals[v]
 
-def find_changed_vars(browser_id, old_copy):
-    global browser_weakvaldict
-    this_browser = browser_weakvaldict[browser_id]
+def find_changed_vars(this_browser, old_copy):
     # input is copy of relevant variable dict and latest shared_locals; find which are changed or deleted
     changed = {}
     deleted = []
     rel_vars = this_browser.rel_vars
     for v in rel_vars:
-        current = lookup(browser_id, v, "get")
-        if (current == None) and (v in old_copy.keys()):
+        current = lookup(this_browser, v, "get")
+        if (current is None) and (v in old_copy.keys()):
             deleted.append(v)
         elif current != old_copy.get(v):
             if isinstance(current, list):
@@ -484,19 +489,16 @@ def find_changed_vars(browser_id, old_copy):
                 changed[v] = current
     return [changed, deleted]
 
-def send_graph_vars(browser_id, graph_vars):
-    global browser_weakvaldict
-    this_browser = browser_weakvaldict[browser_id]
-    g_vars = {}
+def send_graph_vars(this_browser):
+    to_send = {}
+    graph_vars = this_browser.graph_vars
     for k in graph_vars.keys():
-        g_vars[k] = list(graph_vars[k])
-    this_browser.browser.ExecuteJavascript("update_graph_vectors({})".format(json.dumps(g_vars)))
+        to_send[k] = list(graph_vars[k])
+    this_browser.browser.ExecuteJavascript("update_graph_vectors({})".format(json.dumps(to_send)))
 
-def _update_browser_vars(browser_id, locals_copy):  
-    global FIH, t_tracker, browser_weakvaldict
-    this_browser = browser_weakvaldict[browser_id]
+def _update_browser_vars(this_browser, locals_copy):  
     # create dictionary of the changed variables 
-    changed_vars, deleted_vars = find_changed_vars(browser_id, locals_copy)
+    changed_vars, deleted_vars = find_changed_vars(this_browser, locals_copy)
     locals_copy.update(changed_vars)
     # handle deletions separately 
     for d in deleted_vars:
@@ -505,13 +507,15 @@ def _update_browser_vars(browser_id, locals_copy):
     if changed_vars or deleted_vars:
         this_browser.browser.ExecuteJavascript("update_html_variable_displays({}, {})".format(json.dumps(changed_vars), json.dumps(deleted_vars)))
     # handle graph vectors - send if finitialize has been called or h.t has changed
-    graph_vars = this_browser.graph_vars
-    if FIH == 1:
-        send_graph_vars(browser_id, graph_vars)
-        FIH = 0
-    elif h.t != t_tracker:
-        send_graph_vars(browser_id, graph_vars)
-
+    current_lengthT = len(this_browser.graph_vars.get("h.t"))
+    if this_browser.fih == 1:
+        send_graph_vars(this_browser)
+        this_browser.fih = 0
+        this_browser.t_tracker = current_lengthT
+        #TODO handle if no graphs.  if it matters: handle if there are graphs, but no graph with h.t
+    elif current_lengthT != this_browser.t_tracker:
+        send_graph_vars(this_browser)
+        this_browser.t_tracker = current_lengthT
 def setupSim():
     shared_locals['shell'].runfile('setup.txt')
 

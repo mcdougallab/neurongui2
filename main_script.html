@@ -53,33 +53,37 @@ function update_html_variable_displays(changed, deleted) {
 }
 
 function update_graph_vectors(graph_vars) {
-    // update multivariable plots
+    // update graph vector plots
     // assumes that vars have only been sent if all vectors have changed or been reinitialized
     $("div[class='lineplot']").each( function () {
         var x_var = $(this).attr('data-x-var');
-
-        if (!(graph_vars[x_var].length > 0)) {
+        //console.log(graph_vars[x_var].length);
+        if (graph_vars[x_var].length == 0) {
             make_lineplot([], this);
         }
 
         var y_vars = $(this).attr('data-y-var').split(';');
         var x_val = graph_vars[x_var]
-        var lineplot_data = [];  
+        var lineplot_data = {}; 
+        var ymins = [];
+        var ymaxs =[];
         if (x_val.length > 0) {
-            $.each(y_vars, function(ind, y) {
+            $.each(y_vars, function (ind, y) {
                 var y_val = graph_vars[y]
-                lineplot_data.push(x_val.map((k, i) => [k, y_val[i]]));
+                ymins.push(Math.min(...y_val));
+                ymaxs.push(Math.max(...y_val));
+                if (x_val.length <= y_val.length) { // ensures that mapping will go smoothly
+                    lineplot_data[y] = x_val.map((k, i) => [k, y_val[i]]); 
+                }
             })
         }
-
-        if (lineplot_data.length > 0) {
-            make_lineplot(lineplot_data, this);
+        var dimensions = [Math.min(...x_val), Math.max(...x_val), Math.min(...ymins), Math.max(...ymaxs)]; 
+        if (lineplot_data) {
+            make_lineplot(lineplot_data, this, dimensions);
         }
-
         // reformatted to input to lineplot
-        // [series1, series2, series3]
+        // {"1": series1, "2": series2, "3": series3}
         // where series1 = [[x, y1], [x, y1], ...]
-
     });
 };
 
@@ -144,14 +148,20 @@ function make_barplot(dat, object) {
 
 };
 
-function make_lineplot(dat, object) {
-    // have a list (limitless?) to generate different colors depending on number of series to plot
+function make_lineplot(dat, object, dims) {
+    // have a list (TODO: limitless?) to generate different colors depending on number of series to plot
     // plot each series using a for loop
-    var colorpick = ["blue", "red", "yellow", "green"];
+    var colorpick = ["steelblue", "red", "yellow", "green"];
+    var xlabel = $(object).attr("data-xlab");
+    var ylabel = $(object).attr("data-ylab");
 
     var div = d3.select(object);
     // clear a previous plot --- CHANGE THIS
     // TODO: only clear if dat is empty; otherwise only update the lineplot data with changed values
+    if (dat && dat.length == 0) {
+        div.select("svg").remove();
+        return;
+    }
     div.select("svg").remove();
 
     var w = parseFloat(div.style("width").replace("px", ""));
@@ -159,57 +169,58 @@ function make_lineplot(dat, object) {
     var margin = 50;
 
     var svg = div.append("svg").attr("width", w).attr("height", h);
+    
+    //tmin, tmax, ymin, ymax = dims
+    var padding = Math.floor((dims[3]-dims[2])/10);
 
-    $.each(dat, function(index, k) {  // go through each series
-        var series_dat = k;
+    var xscale = d3.scaleLinear()
+    .domain([dims[0], dims[1]])
+    .range([margin, w-margin/2]);
+
+    var yscale = d3.scaleLinear()
+    .domain([dims[2]-padding, dims[3]+padding])
+    .range([h-margin, margin/2]);
+
+    svg.append("g")
+        .attr("class", "axis")
+        .attr("transform", `translate(${margin},0)`)
+        .call(d3.axisLeft()
+            .scale(yscale));
+    svg.append("g")
+        .attr("class", "axis")
+        .attr("transform", `translate(0,${h-margin})`)
+        .call(d3.axisBottom()
+            .scale(xscale));
+    svg.append("text")
+        .attr("x", xscale(dims[1]-0.5*(dims[1]-dims[0])))
+        .attr("y", h-margin*0.3)
+        .text(xlabel)
+        .attr("text-anchor", "middle")
+        .attr("font-size", "16px");
+    svg.append("text")
+        .attr("x", margin*0.3)
+        .attr("y", yscale(dims[3] - 0.5*(dims[3]-dims[2])))
+        .attr("transform", `rotate(-90,${margin*0.3},${yscale(dims[3]-0.5*(dims[3]-dims[2]))})`)
+        .text(ylabel)
+        .attr("text-anchor", "middle")
+        .attr("font-size", "16px");
+
+    var index = 0;
+    $.each(dat, function(series_name, series_dat) {  // go through each series
         var series_color = colorpick[index];
-
-        var tmin = d3.min(series_dat, function(d) {return d[0]});
-        var tmax = d3.max(series_dat, function(d) {return d[0]});
-        var ymin = d3.min(series_dat, function(d) {return d[1]});
-        var ymax = d3.max(series_dat, function(d) {return d[1]});
-
-        var xscale = d3.scaleLinear()
-        .domain([tmin, tmax])
-        .range([margin, w-margin/2]);
-
-        var yscale = d3.scaleLinear()
-        .domain([ymin-10, ymax+10])
-        .range([h-margin, margin/2]);
 
         svg.append("path")
             .datum(series_dat)
             .attr("fill", "none")
-            .attr("stroke", "steelblue")
-            .attr("stroke-width", 1.5)
+            .attr("stroke", series_color)
+            .attr("stroke-width", 2)
             .attr("d", d3.line()
                 .x(function(d) {return xscale(d[0]);})
                 .y(function(d) {return yscale(d[1]);}));
 
-        svg.append("g")
-            .attr("class", "axis")
-            .attr("transform", `translate(${margin},0)`)
-            .call(d3.axisLeft()
-                .scale(yscale));
-        svg.append("g")
-            .attr("class", "axis")
-            .attr("transform", `translate(0,${h-margin})`)
-            .call(d3.axisBottom()
-                .scale(xscale));
-        svg.append("text")
-            .attr("x", xscale(tmax-0.5*(tmax-tmin)))
-            .attr("y", h-margin*0.3)
-            .text("time (ms)")
-            .attr("text-anchor", "middle")
-            .attr("font-size", "16px");
-        svg.append("text")
-            .attr("x", margin*0.3)
-            .attr("y", yscale(ymax - 0.5*(ymax-ymin)))
-            .attr("transform", `rotate(-90,${margin*0.3},${yscale(ymax-0.5*(ymax-ymin))})`)
-            .text("voltage (mV)")
-            .attr("text-anchor", "middle")
-            .attr("font-size", "16px");
+        //TODO: add legend 
 
+        index++;
     });
 
 };

@@ -15,7 +15,6 @@
         width: 400px;
         height: 400px;
         border: 2px solid black;
-        float: left;
         padding: 10px;
         background-color: white;
     }
@@ -68,7 +67,9 @@
 
 </div>
 
-<div class="lineplot" data-x-var="h.t" data-y-var="seg.v" style="margin-top:50px; width:400px; height:400px"></div>
+<div class="lineplot" data-x-var="h.t" data-y-var="seg.v" data-xlab="time (ms)" data-ylab="voltage (mV)" style="margin-top:50px; width:400px; height:400px; float:left"></div>
+<div class="lineplot" data-x-var="h.t" data-y-var="seg.m_hh;seg.n_hh" data-xlab="time (ms)" data-ylab="m and n" style="margin-top:50px; width:300px; height:300px; float:right"></div>
+<div class="lineplot" data-x-var="h.t" data-y-var="seg.h_hh" data-xlab="time (ms)" data-ylab="h" style="margin-top:50px; width:300px; height:300px; float:left"></div>
 
 
 
