@@ -499,12 +499,16 @@ def find_changed_vars(this_browser, old_copy):
                 changed[v] = current
     return [changed, deleted]
 
-def send_graph_vars(this_browser):
+def send_graph_vars(this_browser, action):
+    # action is either make or update
     to_send = {}
     graph_vars = this_browser.graph_vars
     for k in graph_vars.keys():
-        to_send[k] = list(graph_vars[k])
-    this_browser.browser.ExecuteJavascript("update_graph_vectors({})".format(json.dumps(to_send)))
+        if action == "make":
+            to_send[k] = list(graph_vars[k])
+        elif action == "update":
+            to_send[k] = list(graph_vars[k])[this_browser.t_tracker:]  # only the new data
+    this_browser.browser.ExecuteJavascript("update_graph_vectors({}, {})".format(json.dumps(to_send), json.dumps([action])))
 
 def _update_browser_vars(this_browser, locals_copy):  
     # create dictionary of the changed variables 
@@ -518,25 +522,19 @@ def _update_browser_vars(this_browser, locals_copy):
         this_browser.browser.ExecuteJavascript("update_html_variable_displays({}, {})".format(json.dumps(changed_vars), json.dumps(deleted_vars)))
     # handle graph vectors - if browser ready and there are graphs
     if this_browser.graph_vars:
-        if this_browser.data_waiting is not None:
-            # this is mostly a placeholder; will have to change when sending ONLY new data
-            this_browser.ready_status = 0
-            send_graph_vars(this_browser)
-            this_browser.data_waiting = None
+        current_lengthT = len(this_browser.graph_vars.get(this_browser.t_tracker_vec))
         if this_browser.ready_status == 1:
             #send if finitialize has been called or h.t has changed
-            current_lengthT = len(this_browser.graph_vars.get(this_browser.t_tracker_vec))
             if this_browser.fih == 1:
+                # t_tracker has not been updated since last data sent, so will send ALL new data
                 this_browser.ready_status = 0
-                send_graph_vars(this_browser)
+                send_graph_vars(this_browser, 'make')
                 this_browser.fih = 0
                 this_browser.t_tracker = current_lengthT
             elif current_lengthT != this_browser.t_tracker:
                 this_browser.ready_status = 0
-                send_graph_vars(this_browser)
+                send_graph_vars(this_browser, 'update')
                 this_browser.t_tracker = current_lengthT
-        else:
-            this_browser.data_waiting = this_browser.graph_vars
 
 def setupSim():
     shared_locals['shell'].runfile('setup.txt')

@@ -73,40 +73,48 @@ function update_html_variable_displays(changed, deleted) {
     });
 }
 
-function update_graph_vectors(graph_vars) {
+function update_graph_vectors(graph_vars, action) {
     // update graph vector plots
     // assumes that vars have only been sent if all vectors have changed or been reinitialized
-    $("div[class='lineplot']").each( function () {
+    // action determines if making or updating plots
+    d3.selectAll("div[class='lineplot']").each( function () {
+        var id = $(this).attr('id');
         var x_var = $(this).attr('data-x-var');
         console.log(graph_vars[x_var].length);
-        if (graph_vars[x_var].length == 0) {
-            make_lineplot([], this);
-        }
+        if (graph_vars[x_var].length > 0) {
 
-        var y_vars = $(this).attr('data-y-var').split(';');
-        var x_val = graph_vars[x_var]
-        var lineplot_data = {}; 
-        var ymins = [];
-        var ymaxs =[];
-        if (x_val.length > 0) {
-            $.each(y_vars, function (ind, y) {
-                var y_val = graph_vars[y]
-                ymins.push(arrayMin(y_val));
-                ymaxs.push(arrayMax(y_val));
-                if (x_val.length <= y_val.length) { // ensures that mapping will go smoothly
-                    lineplot_data[y] = x_val.map((k, i) => [k, y_val[i]]);
+            var y_vars = $(this).attr('data-y-var').split(';');
+            var x_val = graph_vars[x_var]
+            var lineplot_data = {}; 
+            var ymins = [];
+            var ymaxs =[];
+
+            if (action=='make') {    // make a new lineplot
+                $.each(y_vars, function (ind, y) {  
+                    var y_val = graph_vars[y]
+                    ymins.push(arrayMin(y_val));
+                    ymaxs.push(arrayMax(y_val));
+                    if (x_val.length <= y_val.length) { // ensures that mapping will go smoothly
+                        // TODO: is this check ^ necessary anymore? and what to do if it fails?
+                        lineplot_data[y] = x_val.map((k, i) => [k, y_val[i]]);
+                    }
+                })
+                if (lineplot_data) {
+                    var dimensions = [arrayMin(x_val), arrayMax(x_val), arrayMin(ymins), arrayMax(ymaxs)]; 
+                    make_lineplot(lineplot_data, this, dimensions);
                 }
-            })
-        }
-        var dimensions = [arrayMin(x_val), arrayMax(x_val), arrayMin(ymins), arrayMax(ymaxs)]; 
-        if (lineplot_data) {
-            make_lineplot(lineplot_data, this, dimensions);
+            }
+
+            else if (action=='update') {
+                update_lineplot(this, x_var, y_vars, graph_vars);
+            }
             // reformatted to input to lineplot
-            // {"1": series1, "2": series2, "3": series3}
-            // where series1 = [[x, y1], [x, y1], ...]
+                // {"1": series1, "2": series2, "3": series3}
+                // where series1 = [[x, y1], [x, y1], ...]
         }
-        _flag_browser_ready(browser_id);
+        
     });
+    _flag_browser_ready(browser_id);
 };
 
 // attach button clicks to correct python functions
@@ -171,24 +179,20 @@ function make_barplot(dat, object) {
 };
 
 function make_lineplot(dat, object, dims) {
-    // have a list (TODO: limitless?) to generate different colors depending on number of series to plot
+    console.log("making lineplot");
     // plot each series using a for loop
+    // have a list (TODO: limitless?) to generate different colors depending on number of series to plot
     var colorpick = ["steelblue", "red", "yellow", "green"];
+    var div = d3.select(object);
+     
     var xlabel = $(object).attr("data-xlab");
     var ylabel = $(object).attr("data-ylab");
-
-    var div = d3.select(object);
-    // clear a previous plot --- CHANGE THIS
-    // TODO: only clear if dat is empty; otherwise only update the lineplot data with changed values
-    if (dat && dat.length == 0) {
-        div.select("svg").remove();
-        return;
-    }
-    div.select("svg").remove();
 
     var w = parseFloat(div.style("width").replace("px", ""));
     var h = parseFloat(div.style("height").replace("px", ""));
     var margin = 50;
+
+    div.select("svg").remove();
 
     var svg = div.append("svg").attr("width", w).attr("height", h);
     
@@ -204,15 +208,17 @@ function make_lineplot(dat, object, dims) {
     .range([h-margin, margin/2]);
 
     svg.append("g")
-        .attr("class", "axis")
+        .attr("class", "yaxis")
         .attr("transform", `translate(${margin},0)`)
         .call(d3.axisLeft()
-            .scale(yscale));
+            .scale(yscale)
+            .ticks(10));
     svg.append("g")
-        .attr("class", "axis")
+        .attr("class", "xaxis")
         .attr("transform", `translate(0,${h-margin})`)
         .call(d3.axisBottom()
-            .scale(xscale));
+            .scale(xscale)
+            .ticks(6));
     svg.append("text")
         .attr("x", xscale(dims[1]-0.5*(dims[1]-dims[0])))
         .attr("y", h-margin*0.3)
@@ -227,12 +233,29 @@ function make_lineplot(dat, object, dims) {
         .attr("text-anchor", "middle")
         .attr("font-size", "16px");
 
+    //legend TODO: default to variable names if no legendlabs given
+    /*var legend_labs = $(object).attr('data-legendlabs').split(';');
+    $.each(legend_labs, function(ind, lab) {
+        svg.append("rect")
+            .attr("x", )
+            .attr("y", )
+            .attr("width", 40)
+            .attr("height", 40)
+            .attr("fill", colorpick[ind])
+        svg.append("text")
+            .attr("x", )
+            .attr("y", )
+            .text(lab)
+            .attr("font-size", "12px");
+    })*/
+
     var index = 0;
     $.each(dat, function(series_name, series_dat) {  // go through each series
         var series_color = colorpick[index];
-
         svg.append("path")
             .datum(series_dat)
+            .attr("id", series_name.replace('.','_'))
+            .attr("class", "line")
             .attr("fill", "none")
             .attr("stroke", series_color)
             .attr("stroke-width", 2)
@@ -240,19 +263,94 @@ function make_lineplot(dat, object, dims) {
                 .x(function(d) {return xscale(d[0]);})
                 .y(function(d) {return yscale(d[1]);}));
 
-        //TODO: add legend 
-
         index++;
     });
-
 };
+
+//function update_lineplot(new_dat, object, new_dims) {
+function update_lineplot(object, x_var, y_vars, graph_vars) {
+    console.log("updating lineplot");
+    //----------------------------- temporary? ----------------
+
+    var x_val = graph_vars[x_var]
+    var lineplot_data = {}; 
+    var ymins = [];
+    var ymaxs =[];
+    var svg = d3.select(object).select('svg');
+
+    $.each(y_vars, function (ind, y) {
+        var p_data = svg.select(`#${y.replace('.','_')}`).datum();//[0];
+        var y_val = graph_vars[y]
+        ymins.push(arrayMin(p_data.map((k, i) => k[1])));    // will this mapping work?
+        ymins.push(arrayMin(y_val)); // need to compare both
+        ymaxs.push(arrayMax(p_data.map((k, i) => k[1])));
+        ymaxs.push(arrayMax(y_val));
+        if (x_val.length <= y_val.length) { // ensures that mapping will go smoothly
+            // TODO: is this check ^ necessary anymore? also, better to chop off extra if it fails but still go on I think
+            new_formatted_data = x_val.map((k, i) => [k, y_val[i]]);
+            lineplot_data[y] = p_data.concat(new_formatted_data);
+        }
+    })
+
+    if (lineplot_data) {
+        var anyseries = lineplot_data[y_vars[0]];
+        // also check against previous x range
+        var xmin = arrayMin(anyseries.map((k, i) => k[0]));
+        var xmax = arrayMax(anyseries.map((k, i) => k[0]));
+        // TODO: is it easier to do all the recalculation of dimensions just within the update_lineplot func?
+        var new_dims = [xmin, xmax, arrayMin(ymins), arrayMax(ymaxs)]; 
+    
+        var new_dat = lineplot_data;
+        //------------------------------------------------------------
+        // don't delete everything; update axes and update the data for each of the paths
+        var colorpick = ["steelblue", "red", "yellow", "green"];
+        var div = d3.select(object);
+        var svg = div.select("svg");
+
+        var w = parseFloat(div.style("width").replace("px", ""));
+        var h = parseFloat(div.style("height").replace("px", ""));
+        var margin = 50;
+        var padding = Math.floor((new_dims[3]-new_dims[2])/10);
+
+        // update the axes
+        var xscale = d3.scaleLinear()
+            .domain([new_dims[0], new_dims[1]])
+            .range([margin, w-margin/2]);
+
+        var yscale = d3.scaleLinear()
+            .domain([new_dims[2]-padding, new_dims[3]+padding])
+            .range([h-margin, margin/2]);
+
+        svg.select(".yaxis")
+            .transition()
+            .call(d3.axisLeft()
+                .scale(yscale)
+                .ticks(10));
+        svg.select(".xaxis")
+            .transition()
+            .call(d3.axisBottom()
+                .scale(xscale)
+                .ticks(6));
+
+        var index = 0;
+        $.each(new_dat, function(series_name, series_dat) {  // go through each series
+            var series_color = colorpick[index];
+            svg.select(`#${series_name.replace('.','_')}`)
+                .data([series_dat])
+                .attr("d", d3.line()
+                    .x(function(d) {return xscale(d[0]);})
+                    .y(function(d) {return yscale(d[1]);}));
+
+            //TODO: add legend 
+
+            index++;
+        });
+    }
+
+}
 
 </script>
 </body>
 </html>
-
-
-
-
 
 
