@@ -201,7 +201,7 @@ function make_lineplot(dat, object, dims) {
 
     var xscale = d3.scaleLinear()
     .domain([dims[0], dims[1]])
-    .range([margin, w-margin/2]);
+    .range([margin+10, w+10-margin/2]);
 
     var yscale = d3.scaleLinear()
     .domain([dims[2]-padding, dims[3]+padding])
@@ -209,7 +209,7 @@ function make_lineplot(dat, object, dims) {
 
     svg.append("g")
         .attr("class", "yaxis")
-        .attr("transform", `translate(${margin},0)`)
+        .attr("transform", `translate(${margin+10},0)`)
         .call(d3.axisLeft()
             .scale(yscale)
             .ticks(10));
@@ -226,7 +226,7 @@ function make_lineplot(dat, object, dims) {
         .attr("text-anchor", "middle")
         .attr("font-size", "16px");
     svg.append("text")
-        .attr("x", margin*0.3)
+        .attr("x", 5)
         .attr("y", yscale(dims[3] - 0.5*(dims[3]-dims[2])))
         .attr("transform", `rotate(-90,${margin*0.3},${yscale(dims[3]-0.5*(dims[3]-dims[2]))})`)
         .text(ylabel)
@@ -234,20 +234,24 @@ function make_lineplot(dat, object, dims) {
         .attr("font-size", "16px");
 
     //legend TODO: default to variable names if no legendlabs given
-    /*var legend_labs = $(object).attr('data-legendlabs').split(';');
-    $.each(legend_labs, function(ind, lab) {
-        svg.append("rect")
-            .attr("x", )
-            .attr("y", )
-            .attr("width", 40)
-            .attr("height", 40)
-            .attr("fill", colorpick[ind])
-        svg.append("text")
-            .attr("x", )
-            .attr("y", )
-            .text(lab)
-            .attr("font-size", "12px");
-    })*/
+    var legend_labs = $(object).attr('data-legendlabs');
+    if (legend_labs) {
+        legend_labs = legend_labs.split(';');
+        var nleg = legend_labs.length;
+        $.each(legend_labs, function(ind, lab) {
+            svg.append("rect")
+                .attr("x", (ind+1)*(w/(nleg+1)))
+                .attr("y", margin/4-8)
+                .attr("width", 10)
+                .attr("height", 10)
+                .attr("fill", colorpick[ind])
+            svg.append("text")
+                .attr("x", (ind+1)*(w/(nleg+1)) + 13)
+                .attr("y", margin/4)
+                .text(lab)
+                .attr("font-size", "12px");
+        })
+    }
 
     var index = 0;
     $.each(dat, function(series_name, series_dat) {  // go through each series
@@ -315,7 +319,7 @@ function update_lineplot(object, x_var, y_vars, graph_vars) {
         // update the axes
         var xscale = d3.scaleLinear()
             .domain([new_dims[0], new_dims[1]])
-            .range([margin, w-margin/2]);
+            .range([margin+10, w+10-margin/2]);
 
         var yscale = d3.scaleLinear()
             .domain([new_dims[2]-padding, new_dims[3]+padding])
