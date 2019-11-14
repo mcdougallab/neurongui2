@@ -1,5 +1,4 @@
-from neuron import h
-import gui
+from my_neuron import h
 
 h.load_file('stdrun.hoc')
 
@@ -12,13 +11,13 @@ ic.amp = 40  # since by default a very large section
 ic.delay = 1
 ic.dur = 1
 
-gui.xpanel("Hello world")
-gui.xlabel("Here is some text")
-gui.xvalue("h.t", "h.t")
-gui.xbutton("finitialize", "h.finitialize(-65)")
-gui.xbutton("run", "h.run()")
-g = gui.Graph()
+h.xpanel("Hello world")
+h.xlabel("Here is some text")
+h.xvalue("h.t", "h.t")
+h.xbutton("finitialize", "h.finitialize(-65)")
+h.xbutton("run", "h.run()")
+g = h.Graph()
 g.addvar("v", "seg.v")
-gui.xpanel()
+h.xpanel()
 
 h.finitialize(-65)
