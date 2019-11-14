@@ -33,9 +33,13 @@ class XLabel(Widget):
 class Container(Widget):
     def __init__(self):
         self.widgets = []
+        self.orientation = 'vertical'
 
     def to_html(self):
-        return '<br/>\n'.join(widget.to_html() for widget in self.widgets)
+        if self.orientation == 'horizontal':
+            return '<table><tr><td>' + '</td>\n<td>'.join(widget.to_html() for widget in self.widgets) + '</td></tr></table>'
+        else:
+            return '<br/>\n'.join(widget.to_html() for widget in self.widgets)
     
     def add(self, item):
         self.widgets.append(item)
@@ -45,11 +49,61 @@ class Window(Container):
     def __init__(self, title):
         Container.__init__(self)
         self.title = title
+        #self.orientation = 'horizontal'
 
     def get_active_container(self):
         # TODO: expand when allowing nesting
         return self
 
+
+class HBox(Container):
+    def __init__(self):
+        Container.__init__(self)
+        self.orientation = 'horizontal'
+    
+    def intercept(self, value):
+        if value:
+            active_container.append(self)
+        elif active_container[-1] != self and not value:
+            # do nothing
+            pass
+        else:
+            active_container.pop()
+    
+    def map(self):
+        if not active_container:
+            raise Exception('not currently supporting top-level HBox')
+
+        if active_container[-1] == self:
+            raise Exception('can only map to different container')
+
+        active_container[-1].add(self)
+
+
+class VBox(Container):
+    def __init__(self):
+        Container.__init__(self)
+        self.orientation = 'vertical'
+    
+    def intercept(self, value):
+        if value:
+            active_container.append(self)
+        elif active_container[-1] != self and not value:
+            # do nothing
+            pass
+        else:
+            active_container.pop()
+    
+    def map(self):
+        if not active_container:
+            raise Exception('not currently supporting top-level VBox')
+
+        if active_container[-1] == self:
+            raise Exception('can only map to different container')
+
+        active_container[-1].add(self)
+
+active_container = []
 
 active_window = None
 
@@ -62,6 +116,7 @@ def xpanel(*args):
         raise Exception('no active xpanel')
     if args:
         active_window = Window(args[0])
+        active_container.append(active_window)
     else:
         html = active_window.to_html()
         active_window = None
@@ -70,21 +125,21 @@ def xpanel(*args):
 
 
 def xvalue(prompt, variable):
-    active_window.get_active_container().add(XValue(prompt, variable))
+    active_container[-1].add(XValue(prompt, variable))
 
 
 def xlabel(text):
-    active_window.get_active_container().add(XLabel(text))
+    active_container[-1].add(XLabel(text))
 
 
 def xbutton(prompt, callback):
-    active_window.get_active_container().add(XButton(prompt, callback))
+    active_container[-1].add(XButton(prompt, callback))
 
 class Graph(Widget):
     def __init__(self):
         self.label = []
         self.varname = []
-        active_window.get_active_container().add(self)
+        active_container[-1].add(self)
 
     def addvar(self, label, varname):
         self.label.append(label)
