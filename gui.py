@@ -65,6 +65,7 @@ def xpanel(*args):
     else:
         html = active_window.to_html()
         active_window = None
+        print(html)
         make_browser_html(html)
 
 
@@ -78,3 +79,17 @@ def xlabel(text):
 
 def xbutton(prompt, callback):
     active_window.get_active_container().add(XButton(prompt, callback))
+
+class Graph(Widget):
+    def __init__(self):
+        self.label = []
+        self.varname = []
+        active_window.get_active_container().add(self)
+
+    def addvar(self, label, varname):
+        self.label.append(label)
+        self.varname.append(varname)
+
+    def to_html(self):
+        return """<div class="lineplot" data-x-var="h.t" data-y-var="{}" data-xlab="time (ms)" data-legendlabs="{}" style="width:300px; height:300px; border: 1px black solid"></div>""".format(";".join(self.varname), ";".join(self.label))
+
