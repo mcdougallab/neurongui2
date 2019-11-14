@@ -49,11 +49,6 @@ class Window(Container):
     def __init__(self, title):
         Container.__init__(self)
         self.title = title
-        #self.orientation = 'horizontal'
-
-    def get_active_container(self):
-        # TODO: expand when allowing nesting
-        return self
 
 
 class HBox(Container):
@@ -119,9 +114,8 @@ def xpanel(*args):
         active_container.append(active_window)
     else:
         html = active_window.to_html()
+        make_browser_html(html, title=active_window.title)
         active_window = None
-        print(html)
-        make_browser_html(html)
 
 
 def xvalue(prompt, variable):

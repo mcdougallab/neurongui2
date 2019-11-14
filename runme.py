@@ -119,7 +119,7 @@ def scale_window_size_for_high_dpi(width, height):
 
 class MainFrame(wx.Frame):
 
-    def __init__(self, html_file=None, user_mappings={}, html=None):
+    def __init__(self, html_file=None, user_mappings={}, html=None, title=''):
         self.browser = None
         self.html_file = html_file
         self.user_mappings = user_mappings
@@ -157,7 +157,7 @@ class MainFrame(wx.Frame):
         size = scale_window_size_for_high_dpi(WIDTH, HEIGHT)
 
         wx.Frame.__init__(self, parent=None, id=wx.ID_ANY,
-                          title='Simulation Window', size=size)
+                          title=title, size=size)
 
         self.setup_icon()
         self.create_menu()
@@ -356,10 +356,10 @@ def make_terminal():
     #shell.write("Type make_terminal() or make_browser() or quit()\n")
     window.Show(True) 
 
-def make_browser_html(html, user_mappings={}):
+def make_browser_html(html, user_mappings={}, title=''):
     global browser_created_count
     browser_created_count += 1
-    frame = MainFrame(user_mappings=user_mappings, html=html)
+    frame = MainFrame(user_mappings=user_mappings, html=html, title=title)
     frame.Show()
     _all_windows.append(frame)
     return frame

@@ -12,7 +12,7 @@ ic.amp = 40  # since by default a very large section
 ic.delay = 1
 ic.dur = 1
 
-gui.xpanel("Hello world")
+gui.xpanel("Fancier example")
 
 hbox = gui.HBox()
 hbox.intercept(True)
