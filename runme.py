@@ -119,7 +119,7 @@ def scale_window_size_for_high_dpi(width, height):
 
 class MainFrame(wx.Frame):
 
-    def __init__(self, html_file, user_mappings):
+    def __init__(self, html_file=None, user_mappings={}, html=None):
         self.browser = None
         self.html_file = html_file
         self.user_mappings = user_mappings
@@ -131,8 +131,15 @@ class MainFrame(wx.Frame):
         self.data_waiting = None    #graph data waiting for browser to be ready
         self.t_tracker_vec = "h.t"  #which vector to use for graph tracking
 
-        with open(html_file) as f:
-            my_html = f.read()
+        if html_file is not None and html is not None:
+            raise Exception("specify either html_file or html")
+
+        if html is None:
+            with open(html_file) as f:
+                my_html = f.read()
+        else:
+            my_html = html
+
         with open("main_script.html") as f:
             my_wrapper_html = f.read()
 
@@ -349,7 +356,15 @@ def make_terminal():
     #shell.write("Type make_terminal() or make_browser() or quit()\n")
     window.Show(True) 
 
-def make_browser(html_file, user_mappings):
+def make_browser_html(html, user_mappings={}):
+    global browser_created_count
+    browser_created_count += 1
+    frame = MainFrame(user_mappings=user_mappings, html=html)
+    frame.Show()
+    _all_windows.append(frame)
+    return frame
+
+def make_browser(html_file, user_mappings={}):
     global browser_created_count
     browser_created_count += 1
     frame = MainFrame(html_file, user_mappings)
@@ -541,6 +556,10 @@ def setupSim():
 
 shared_locals = {'make_terminal': make_terminal, 'make_browser': make_browser, 'quit': sys.exit, 'delete_var':delete_var,
 'weakdict':browser_weakvaldict, 'sim': lambda: make_browser("simulation1.html"), 'setupSim':setupSim}
+
+# todo: should this be here or in main
+import gui
+gui.make_browser_html = make_browser_html
 
 if __name__ == '__main__':
     main()
