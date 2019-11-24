@@ -260,6 +260,7 @@ class NEURONWindow(NEURONFrame):
             self.Show()
 
     def setup_icon(self):
+        # TODO: we need an icon
         icon_file = os.path.join(os.path.abspath(os.path.dirname(__file__)),
                                  "resources", "wxpython.png")
         # wx.IconFromBitmap is not available on Linux in wxPython 3.0/4.0
@@ -417,8 +418,8 @@ def make_terminal():
     _all_windows.append(shell)
     shared_locals['shell'] = shell
     current_shell = shell
-    shell.run("print('Type make_terminal() or make_browser() or quit()')", verbose=False, prompt=False)
-    #shell.write("Type make_terminal() or make_browser() or quit()\n")
+    shell.write("\nType make_terminal() or setupSim() or quit()\n")
+    shell.prompt()
     window.Show(True) 
 
 def make_browser_html(html, user_mappings={}, title=''):
