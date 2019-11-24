@@ -130,6 +130,7 @@ class NEURONFrame(wx.Frame):
         print('voltage_axis')
         print('args:', args)
         print('kwargs:', kwargs)
+        make_voltage_axis_standalone()
 
     def run_script(self, *args, **kwargs):
         # TODO: we clear entire commands from the shell before running the script
@@ -143,9 +144,6 @@ class NEURONFrame(wx.Frame):
                 return  # cancelled
             path = file_dialog.GetPath()
         extension = os.path.splitext(path)[1]
-        current_shell.redirectStdout(True)
-        current_shell.redirectStdin(True)
-        current_shell.redirectStderr(True)
         # store the old command
         #old_command = current_shell.getMultilineCommand()
         old_command = current_shell.getCommand()
@@ -185,7 +183,7 @@ class NEURONFrame(wx.Frame):
 
 class NEURONWindow(NEURONFrame):
 
-    def __init__(self, html_file=None, user_mappings={}, html=None, title=''):
+    def __init__(self, html_file=None, user_mappings={}, html=None, title='', size=(600, 400)):
         self.browser = None
         self.html_file = html_file
         self.user_mappings = user_mappings
@@ -220,7 +218,7 @@ class NEURONWindow(NEURONFrame):
         global g_count_windows
         g_count_windows += 1
 
-        size = scale_window_size_for_high_dpi(WIDTH, HEIGHT)
+        size = scale_window_size_for_high_dpi(size[0], size[1])
 
         wx.Frame.__init__(self, parent=None, id=wx.ID_ANY,
                           title=title, size=size)
@@ -402,6 +400,19 @@ class CefApp(wx.App):
         self.timer.Stop()
         return 0
 
+def make_voltage_axis_standalone():
+    html = """
+        <div class="lineplot" data-x-var="h.t" data-y-var="seg.v" data-xlab="time (ms)" data-legendlabs="voltage (mV)" style="width:100vw; height:100vh;"></div>
+    """
+    for sec in h.allsec():
+        break
+    else:
+        print('no sections defined')
+        current_shell.prompt()
+        return
+    return make_browser_html(html, user_mappings={'seg': h.cas()(0.5)}, title='Voltage axis', size=(300, 300))
+
+
 
 _all_windows = []
 current_shell = None
@@ -418,14 +429,17 @@ def make_terminal():
     _all_windows.append(shell)
     shared_locals['shell'] = shell
     current_shell = shell
+    current_shell.redirectStdout(True)
+    current_shell.redirectStdin(True)
+    current_shell.redirectStderr(True)
     shell.write("\nType make_terminal() or setupSim() or quit()\n")
     shell.prompt()
     window.Show(True) 
 
-def make_browser_html(html, user_mappings={}, title=''):
+def make_browser_html(html, user_mappings={}, title='', size=(600, 400)):
     global browser_created_count
     browser_created_count += 1
-    frame = NEURONWindow(user_mappings=user_mappings, html=html, title=title)
+    frame = NEURONWindow(user_mappings=user_mappings, html=html, title=title, size=size)
     frame.Show()
     _all_windows.append(frame)
     return frame
