@@ -13,6 +13,14 @@ class XValue(Widget):
     def to_html(self):
         return """<input type="number" data-variable="{}"><label> {}</label>""".format(self.variable, self.prompt)
 
+class XCheckBox(Widget):
+    def __init__(self, prompt, variable):
+        self.prompt = prompt
+        self.variable = variable
+
+    def to_html(self):
+        return """<input type="checkbox" data-variable="{}"><label> {}</label>""".format(self.variable, self.prompt)
+
 
 class XButton(Widget):
     def __init__(self, prompt, callback):
@@ -120,6 +128,11 @@ def xpanel(*args):
 
 def xvalue(prompt, variable):
     active_container[-1].add(XValue(prompt, variable))
+
+def xcheckbox(prompt, variable):
+    active_container[-1].add(XCheckBox(prompt, variable))
+    import warnings
+    warnings.warn('one of the checkbox sync directions is not yet implemented')
 
 
 def xlabel(text):

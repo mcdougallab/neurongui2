@@ -102,6 +102,10 @@ function update_graph_vectors(graph_vars, action) {
                 if (lineplot_data) {
                     var dimensions = [arrayMin(x_val), arrayMax(x_val), arrayMin(ymins), arrayMax(ymaxs)]; 
                     make_lineplot(lineplot_data, this, dimensions);
+                    $(this).on('resize', function() {
+                        console.log('resize', this);
+                        make_lineplot(lineplot_data, this, dimensions);
+                    })
                 }
             }
 
@@ -135,7 +139,9 @@ $('input').keypress(function(event){
 $('input').focusout(function() {   // also update if focus is lost on input
     _update_vars(browser_id, $(this).attr('data-variable'), $(this).val())
 });
-
+$('input:checkbox').change(function() {   // also update if focus is lost on input
+    _update_vars(browser_id, $(this).attr('data-variable'), $(this).is(':checked'))
+});
 function make_barplot(dat, object) {
 
     var div = d3.select(object);

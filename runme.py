@@ -79,6 +79,15 @@ def main():
         # the same time. This is an incorrect approach
         # and only a temporary fix.
         settings["external_message_pump"] = True
+
+        # argv[0] is used by default in Mac to populate the program menu
+        # e.g. Hide Neuron, Quit Neuron
+        sys.argv[0] = 'NEURON'
+
+        # TODO: apparently need to create an app to have the mac menubar program name say something other than python
+        # see https://stackoverflow.com/questions/12633100/changing-wxpython-app-mac-menu-bar-title
+        # This might not be a big deal, given that NEURON is already an app?
+
     if WINDOWS:
         # noinspection PyUnresolvedReferences, PyArgumentList
         cef.DpiAware.EnableHighDpiSupport()
@@ -116,8 +125,65 @@ def scale_window_size_for_high_dpi(width, height):
         height = max_height
     return width, height
 
+class NEURONFrame(wx.Frame):
+    def voltage_axis(self, *args, **kwargs):
+        print('voltage_axis')
+        print('args:', args)
+        print('kwargs:', kwargs)
 
-class MainFrame(wx.Frame):
+    def run_script(self, *args, **kwargs):
+        # TODO: we clear entire commands from the shell before running the script
+        #       but only restore the active
+        #       stdout is currently going INTO THE PROMPT (so then when you hit enter you probably get a syntax error)
+        with wx.FileDialog(self,
+                        'Select script to run',
+                        wildcard="All runnable files (*.py; *.hoc; *.ses)|*.py;*.hoc;*.ses|Python files (*.py);*.py|HOC files (*.hoc);*.hoc|Session files (*.ses);*.ses",
+                        style=wx.FD_OPEN|wx.FD_FILE_MUST_EXIST) as file_dialog:
+            if file_dialog.ShowModal() == wx.ID_CANCEL:
+                return  # cancelled
+            path = file_dialog.GetPath()
+        extension = os.path.splitext(path)[1]
+        current_shell.redirectStdout(True)
+        current_shell.redirectStdin(True)
+        current_shell.redirectStderr(True)
+        # store the old command
+        #old_command = current_shell.getMultilineCommand()
+        old_command = current_shell.getCommand()
+        current_shell.clearCommand()
+        current_shell.write('\n')
+        if extension == '.py':
+            with open(path) as f:
+                code = compile(f.read(), path, 'exec')
+            current_shell.interp.runcode(code)
+        elif extension in ('.hoc', '.ses'):
+            # the True means it will always run, even if it has already been run
+            h.load_file(True, path)
+        else:
+            print('undefined file:', path)
+            # TODO: how should we handle "impossible" errors like this?
+        # restore the prompt state
+        current_shell.prompt()
+        current_shell.write(old_command)
+    
+    def exit(self, *args, **kwargs):
+        # TODO: put any are-you-sure questions here
+        sys.exit()
+
+    def create_menu(self):
+        filemenu = wx.Menu()
+        run_script_menuitem = filemenu.Append(1, "&Run script\tCtrl+O")
+        self.Bind(wx.EVT_MENU, self.run_script, run_script_menuitem)
+        exit_menuitem = filemenu.Append(wx.ID_EXIT, "E&xit")
+        self.Bind(wx.EVT_MENU, self.exit, exit_menuitem)
+        graph_menu = wx.Menu()
+        voltage_axis_menuitem = graph_menu.Append(2, "&Voltage Axis")
+        self.Bind(wx.EVT_MENU, self.voltage_axis, voltage_axis_menuitem)
+        menubar = wx.MenuBar()
+        menubar.Append(filemenu, "&File")
+        menubar.Append(graph_menu, "&Graph")
+        self.SetMenuBar(menubar)
+
+class NEURONWindow(NEURONFrame):
 
     def __init__(self, html_file=None, user_mappings={}, html=None, title=''):
         self.browser = None
@@ -200,14 +266,6 @@ class MainFrame(wx.Frame):
         if os.path.exists(icon_file) and hasattr(wx, "IconFromBitmap"):
             icon = wx.IconFromBitmap(wx.Bitmap(icon_file, wx.BITMAP_TYPE_PNG))
             self.SetIcon(icon)
-
-    def create_menu(self):
-        filemenu = wx.Menu()
-        filemenu.Append(1, "Some option")
-        filemenu.Append(2, "Another option")
-        menubar = wx.MenuBar()
-        menubar.Append(filemenu, "&File")
-        self.SetMenuBar(menubar)
 
     def embed_browser(self):
         global browser_created_count, browser_weakvaldict
@@ -303,6 +361,9 @@ class CefApp(wx.App):
         self.timer_id = 1
         self.is_initialized = False
         super(CefApp, self).__init__(redirect=redirect)
+        self.SetAppDisplayName('NEURON')
+        self.SetAppName('NEURON')
+
 
     def OnPreInit(self):
         super(CefApp, self).OnPreInit()
@@ -328,7 +389,7 @@ class CefApp(wx.App):
     def create_timer(self):
         # See also "Making a render loop":
         # http://wiki.wxwidgets.org/Making_a_render_loop
-        # Another way would be to use EVT_IDLE in MainFrame.
+        # Another way would be to use EVT_IDLE in NEURONWindow.
         self.timer = wx.Timer(self, self.timer_id)
         self.Bind(wx.EVT_TIMER, self.on_timer, self.timer)
         self.timer.Start(10)  # 10ms timer
@@ -342,16 +403,20 @@ class CefApp(wx.App):
 
 
 _all_windows = []
+current_shell = None
 
 # TODO: incorporate g_count_windows logic
 def make_terminal():
-    window = wx.Frame(None, title="Console [{}]".format(len(_all_windows) + 1), size=(600, 400))
+    global current_shell
+    window = NEURONFrame(None, title="Console [{}]".format(len(_all_windows) + 1), size=(600, 400))
     # by explicitly specifying the locals, we couple the shells together
     # while simultaneously keeping them unable to directly access our code
     # hmm... maybe a bad idea; should we transfer over a gui variable?
     shell = wx.py.shell.Shell(parent=window, locals=shared_locals)
+    window.create_menu()
     _all_windows.append(shell)
     shared_locals['shell'] = shell
+    current_shell = shell
     shell.run("print('Type make_terminal() or make_browser() or quit()')", verbose=False, prompt=False)
     #shell.write("Type make_terminal() or make_browser() or quit()\n")
     window.Show(True) 
@@ -359,7 +424,7 @@ def make_terminal():
 def make_browser_html(html, user_mappings={}, title=''):
     global browser_created_count
     browser_created_count += 1
-    frame = MainFrame(user_mappings=user_mappings, html=html, title=title)
+    frame = NEURONWindow(user_mappings=user_mappings, html=html, title=title)
     frame.Show()
     _all_windows.append(frame)
     return frame
@@ -367,7 +432,7 @@ def make_browser_html(html, user_mappings={}, title=''):
 def make_browser(html_file, user_mappings={}):
     global browser_created_count
     browser_created_count += 1
-    frame = MainFrame(html_file, user_mappings)
+    frame = NEURONWindow(html_file, user_mappings)
     frame.Show()
     _all_windows.append(frame)
     return frame
@@ -529,7 +594,7 @@ def _update_browser_vars(this_browser, locals_copy):
     # create dictionary of the changed variables 
     changed_vars, deleted_vars = find_changed_vars(this_browser, locals_copy)
     locals_copy.update(changed_vars)
-    # handle deletions separately 
+    # handle deletions separately
     for d in deleted_vars:
         del locals_copy[d]
     # update the changed variables for javascript

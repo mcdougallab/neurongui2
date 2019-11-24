@@ -2,7 +2,9 @@ import neuron
 import gui
 from neuron import rxd, units
 
-_gui_functions = ('HBox', 'VBox', 'xpanel', 'xlabel', 'xbutton', 'xvalue', 'Graph')
+_gui_functions = ('HBox', 'VBox', 'xpanel', 'xlabel', 'xbutton', 'xvalue',
+                  'Graph', 'xcheckbox')
+
 
 class H:
     def __getattr__(self, var):
