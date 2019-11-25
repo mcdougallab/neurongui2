@@ -17,6 +17,7 @@ from weakref import WeakValueDictionary
 from neuron import h, nrn_dll_sym
 from neuron.units import ms, mV
 from neuron import hoc
+from neuron.gui2.utilities import _segment_3d_pts
 
 HocObject = hoc.HocObject
 base_path = os.path.split(__file__)[0]
@@ -309,6 +310,14 @@ class NEURONWindow(NEURONFrame):
         if os.path.exists(icon_file) and hasattr(wx, "IconFromBitmap"):
             icon = wx.IconFromBitmap(wx.Bitmap(icon_file, wx.BITMAP_TYPE_PNG))
             self.SetIcon(icon)
+
+    def _do_reset_geometry(self):
+        h.define_shape()
+        secs = list(h.allsec())
+        geo = []
+        for sec in secs:
+            geo += _segment_3d_pts(sec)
+        # TODO: javascript_embedder(("set_neuron_section_data(%s);" % json.dumps(geo))) 
 
     def embed_browser(self):
         global browser_created_count, browser_weakvaldict
