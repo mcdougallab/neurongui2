@@ -193,10 +193,15 @@ class NEURONFrame(wx.Frame):
         build_menu = wx.Menu()
         rxdbuilder_menuitem = build_menu.Append(7, "RxD Builder")
         self.Bind(wx.EVT_MENU, show_rxd_builder, rxdbuilder_menuitem)
+
+        tool_menu = wx.Menu()
+        run_button_menuitem = tool_menu.Append(11, "Run Button")
+        self.Bind(wx.EVT_MENU, show_run_button, run_button_menuitem)
         
         menubar = wx.MenuBar()
         menubar.Append(filemenu, "&File")
         menubar.Append(build_menu, "&Build")
+        menubar.Append(tool_menu, "&Tools")
         menubar.Append(graph_menu, "&Graph")
 
         # TODO: if menu_name already present, add items to existing menu instead
@@ -441,6 +446,15 @@ def make_voltage_axis_standalone():
         current_shell.prompt()
         return
     return make_browser_html(html, user_mappings={'seg': h.cas()(0.5)}, title='Voltage axis', size=(300, 300))
+
+def show_run_button(*args):
+    h.load_file('stdrun.hoc')
+    html = '<button data-onclick="run()" style="width:100%; height:100vh; position: absolute; left:0; top:0">Init & Run</button>'
+    return make_browser_html(html,
+        user_mappings={'run': h.run},
+        title='Run Button',
+        size=(100, 50))
+
 
 class RxDBuilder:
     def __init__(self):
