@@ -12,6 +12,7 @@ import threading
 import time
 import json
 import copy
+import webbrowser
 from weakref import WeakValueDictionary
 from neuron import h, nrn_dll_sym
 from neuron.units import ms, mV
@@ -176,9 +177,27 @@ class NEURONFrame(wx.Frame):
         graph_menu = wx.Menu()
         voltage_axis_menuitem = graph_menu.Append(2, "&Voltage Axis")
         self.Bind(wx.EVT_MENU, self.voltage_axis, voltage_axis_menuitem)
+        help_menu = wx.Menu()
+        progref_menuitem = help_menu.Append(3, "Programmer's Reference")
+        tutorials_menuitem = help_menu.Append(4, "Tutorials")
+        forum_menuitem = help_menu.Append(5, "NEURON Forum")
+        models_menuitem = help_menu.Append(6, "NEURON Models on ModelDB")
+        self.Bind(wx.EVT_MENU, 
+                lambda *args: webbrowser.open('https://www.neuron.yale.edu/neuron/static/py_doc/index.html'),
+                progref_menuitem)
+        self.Bind(wx.EVT_MENU,
+            lambda *args: webbrowser.open('https://neuron.yale.edu/neuron/docs'),
+            tutorials_menuitem)
+        self.Bind(wx.EVT_MENU,
+            lambda *args: webbrowser.open('https://neuron.yale.edu/phpBB/'),
+            forum_menuitem)
+        self.Bind(wx.EVT_MENU,
+            lambda *args: webbrowser.open('https://senselab.med.yale.edu/ModelDB/ModelList.cshtml?id=1882'),
+            models_menuitem)
         menubar = wx.MenuBar()
         menubar.Append(filemenu, "&File")
         menubar.Append(graph_menu, "&Graph")
+        menubar.Append(help_menu, "&Help")
         self.SetMenuBar(menubar)
 
 class NEURONWindow(NEURONFrame):
