@@ -133,7 +133,6 @@ class NEURONFrame(wx.Frame):
     def run_script(self, *args, **kwargs):
         # TODO: we clear entire commands from the shell before running the script
         #       but only restore the active
-        #       stdout is currently going INTO THE PROMPT (so then when you hit enter you probably get a syntax error)
         with wx.FileDialog(self,
                         'Select script to run',
                         wildcard="All runnable files (*.py; *.hoc; *.ses)|*.py;*.hoc;*.ses|Python files (*.py);*.py|HOC files (*.hoc);*.hoc|Session files (*.ses);*.ses",
