@@ -324,6 +324,7 @@ function update_lineplot(object, x_var, y_vars, graph_vars) {
         var xmin = arrayMin(anyseries.map((k, i) => k[0]));
         var xmax = arrayMax(anyseries.map((k, i) => k[0]));
         // TODO: is it easier to do all the recalculation of dimensions just within the update_lineplot func?
+        // TODO: allow a data- for setting extrema
         var new_dims = [xmin, xmax, arrayMin(ymins), arrayMax(ymaxs)]; 
     
         var new_dat = lineplot_data;
@@ -332,9 +333,10 @@ function update_lineplot(object, x_var, y_vars, graph_vars) {
         var colorpick = ["steelblue", "red", "yellow", "green"];
         var div = d3.select(object);
         var svg = div.select("svg");
-
-        var w = parseFloat(div.style("width").replace("px", ""));
-        var h = parseFloat(div.style("height").replace("px", ""));
+        var div_jquery = $(object);
+    
+        var w = div_jquery.width();
+        var h = div_jquery.height();
         var margin = 50;
         var padding = Math.floor((new_dims[3]-new_dims[2])/10);
 
