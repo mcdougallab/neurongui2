@@ -191,8 +191,12 @@ class NEURONFrame(wx.Frame):
         self.Bind(wx.EVT_MENU,
             lambda *args: webbrowser.open('https://senselab.med.yale.edu/ModelDB/ModelList.cshtml?id=1882'),
             models_menuitem)
+        build_menu = wx.Menu()
+        rxdbuilder_menuitem = build_menu.Append(7, "RxD Builder")
+        self.Bind(wx.EVT_MENU, show_rxd_builder, rxdbuilder_menuitem)
         menubar = wx.MenuBar()
         menubar.Append(filemenu, "&File")
+        menubar.Append(build_menu, "&Build")
         menubar.Append(graph_menu, "&Graph")
         menubar.Append(help_menu, "&Help")
         self.SetMenuBar(menubar)
@@ -297,14 +301,18 @@ class NEURONWindow(NEURONFrame):
         self.browser.SetClientHandler(FocusHandler())
         browser_weakvaldict[self.browser_id] = self # create mapping to frame object in weak value dict
 
+    def register_binding(self, name, f):
+        """Use this to setup a connection between javascript in the window and Python"""
+        self.bindings.SetFunction(name, f)
+        self.browser.SetJavascriptBindings(self.bindings)
+
     def set_browser_callbacks(self):
         self.bindings = cef.JavascriptBindings(bindToFrames=True, bindToPopups=True)
-        self.bindings.SetFunction("_print_to_terminal", _print_to_terminal)
-        self.bindings.SetFunction("_update_vars", _update_vars)
-        self.bindings.SetFunction("_py_function_handler", _py_function_handler)
-        self.bindings.SetFunction("_set_relevant_vars", _set_relevant_vars)
-        self.bindings.SetFunction("_flag_browser_ready", _flag_browser_ready)
-        self.browser.SetJavascriptBindings(self.bindings)
+        self.register_binding("_print_to_terminal", _print_to_terminal)
+        self.register_binding("_update_vars", _update_vars)
+        self.register_binding("_py_function_handler", _py_function_handler)
+        self.register_binding("_set_relevant_vars", _set_relevant_vars)
+        self.register_binding("_flag_browser_ready", _flag_browser_ready)
 
     def OnSetFocus(self, _):
         if not self.browser:
@@ -428,6 +436,76 @@ def make_voltage_axis_standalone():
         return
     return make_browser_html(html, user_mappings={'seg': h.cas()(0.5)}, title='Voltage axis', size=(300, 300))
 
+class RxDBuilder:
+    def __init__(self):
+        self._active_regions = []
+        self._active_species = []
+        self._active_reactions = []
+        with open(os.path.join(os.path.split(__file__)[0], 'html', 'rxdbuilder.html')) as f:
+            html = f.read()
+        self._frame = make_browser_html(html, title='RxD Builder')
+        self._frame.register_binding("_update_data", self._update_data)
+
+
+    def _update_data(self, var, value):
+        if var == 'active_regions':
+            self._active_regions = value
+        elif var == 'active_species':
+            self._active_species = value
+        elif var == 'active_reactions':
+            self._active_reactions = value
+        else:
+            print('unknown data type:', var)
+            current_shell.prompt()
+
+    def save_model(self, event):
+        with wx.FileDialog(self, "Save RxDBuilder as JSON", wildcard="JSON files (*.json)|*.json",
+                           style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT) as fileDialog:
+
+            if fileDialog.ShowModal() == wx.ID_CANCEL:
+                return
+
+            pathname = fileDialog.GetPath()
+            try:
+                with open(pathname, 'w') as f:
+                    f.write(json.dumps({
+                            'regions': self._active_regions,
+                            'species': self._active_species,
+                            'reactions': self._active_reactions
+                        }, indent=4))
+            except IOError:
+                print('Save failed.')
+                current_shell.prompt()
+            except:
+                print('Mysterious save failure.')
+                current_shell.prompt()
+
+    def save_model_as_python(self, event):
+        with wx.FileDialog(self, "Save RxDBuilder as Python", wildcard="Python files (*.py)|*.py",
+                           style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT) as fileDialog:
+
+            if fileDialog.ShowModal() == wx.ID_CANCEL:
+                return
+
+            pathname = fileDialog.GetPath()
+            try:
+                with open(pathname, 'w') as f:
+                    f.write(model_to_python(self._active_regions, self._active_species, self._active_reactions))
+            except IOError:
+                print('Save failed.')
+                current_shell.prompt()
+            except:
+                print('Mysterious save failure.')
+                current_shell.prompt()
+
+    def instantiate(self, event):
+        my_code = model_to_python(self._active_regions, self._active_species, self._active_reactions)
+        print('Running:\n' + my_code)
+        current_shell.prompt()
+        exec(my_code)
+
+def show_rxd_builder(event):
+    return RxDBuilder()
 
 
 _all_windows = []
