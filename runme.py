@@ -243,7 +243,11 @@ class NEURONWindow(NEURONFrame):
         with open("main_script.html") as f:
             my_wrapper_html = f.read()
 
+        with open(os.path.join(os.path.split(__file__)[0], 'js', 'setup_threejs.js')) as f:
+            three_js_stuff = f.read()
+
         self.wrapper_html = my_wrapper_html.replace("HTML_GOES_HERE", my_html)
+        self.wrapper_html = self.wrapper_html.replace('DECLARE_THREE_JS_HERE', three_js_stuff)
 
         # Must ignore X11 errors like 'BadWindow' and others by
         # installing X11 error handlers. This must be done after
