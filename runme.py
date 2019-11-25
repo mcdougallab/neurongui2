@@ -165,7 +165,7 @@ class NEURONFrame(wx.Frame):
         # TODO: put any are-you-sure questions here
         sys.exit()
 
-    def create_menu(self):
+    def create_menu(self, custom_menus={}):
         filemenu = wx.Menu()
         run_script_menuitem = filemenu.Append(1, "&Run script\tCtrl+O")
         self.Bind(wx.EVT_MENU, self.run_script, run_script_menuitem)
@@ -194,16 +194,23 @@ class NEURONFrame(wx.Frame):
         build_menu = wx.Menu()
         rxdbuilder_menuitem = build_menu.Append(7, "RxD Builder")
         self.Bind(wx.EVT_MENU, show_rxd_builder, rxdbuilder_menuitem)
+        
         menubar = wx.MenuBar()
         menubar.Append(filemenu, "&File")
         menubar.Append(build_menu, "&Build")
         menubar.Append(graph_menu, "&Graph")
+
+        # TODO: if menu_name already present, add items to existing menu instead
+        #       e.g. consider a repeated File menu
+        for menu_name, menu in custom_menus.items():
+            menubar.Append(menu, menu_name)
+
         menubar.Append(help_menu, "&Help")
         self.SetMenuBar(menubar)
 
 class NEURONWindow(NEURONFrame):
 
-    def __init__(self, html_file=None, user_mappings={}, html=None, title='', size=(600, 400)):
+    def __init__(self, html_file=None, user_mappings={}, html=None, title='', size=(600, 400), custom_menus={}):
         self.browser = None
         self.html_file = html_file
         self.user_mappings = user_mappings
@@ -244,7 +251,7 @@ class NEURONWindow(NEURONFrame):
                           title=title, size=size)
 
         self.setup_icon()
-        self.create_menu()
+        self.create_menu(custom_menus=custom_menus)
         self.Bind(wx.EVT_CLOSE, self.OnClose)
 
         # Set wx.WANTS_CHARS style for the keyboard to work.
@@ -443,8 +450,16 @@ class RxDBuilder:
         self._active_reactions = []
         with open(os.path.join(os.path.split(__file__)[0], 'html', 'rxdbuilder.html')) as f:
             html = f.read()
-        self._frame = make_browser_html(html, title='RxD Builder')
+        my_menu = wx.Menu()
+        m_save = my_menu.Append(8, "Save model")
+        m_export_python = my_menu.Append(9, "Export to Python")
+        m_instantiate = my_menu.Append(10, 'Instantiate')
+        custom_menus = {'RxDBuilder': my_menu}
+        self._frame = make_browser_html(html, title='RxD Builder', custom_menus=custom_menus)
         self._frame.register_binding("_update_data", self._update_data)
+        self._frame.Bind(wx.EVT_MENU, self.save_model, m_save)
+        self._frame.Bind(wx.EVT_MENU, self.save_model_as_python, m_export_python)
+        self._frame.Bind(wx.EVT_MENU, self.instantiate, m_instantiate)
 
 
     def _update_data(self, var, value):
@@ -459,7 +474,7 @@ class RxDBuilder:
             current_shell.prompt()
 
     def save_model(self, event):
-        with wx.FileDialog(self, "Save RxDBuilder as JSON", wildcard="JSON files (*.json)|*.json",
+        with wx.FileDialog(self._frame, "Save RxDBuilder as JSON", wildcard="JSON files (*.json)|*.json",
                            style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT) as fileDialog:
 
             if fileDialog.ShowModal() == wx.ID_CANCEL:
@@ -481,7 +496,7 @@ class RxDBuilder:
                 current_shell.prompt()
 
     def save_model_as_python(self, event):
-        with wx.FileDialog(self, "Save RxDBuilder as Python", wildcard="Python files (*.py)|*.py",
+        with wx.FileDialog(self._frame, "Save RxDBuilder as Python", wildcard="Python files (*.py)|*.py",
                            style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT) as fileDialog:
 
             if fileDialog.ShowModal() == wx.ID_CANCEL:
@@ -502,10 +517,96 @@ class RxDBuilder:
         my_code = model_to_python(self._active_regions, self._active_species, self._active_reactions)
         print('Running:\n' + my_code)
         current_shell.prompt()
-        exec(my_code)
+        exec(my_code, shared_locals)
 
 def show_rxd_builder(event):
     return RxDBuilder()
+
+def model_to_python(regions, species, reactions):
+    result = '''from neuron import rxd
+from neuron import h
+'''
+
+    active_regions = set()
+    for sp in species:
+        for r in sp['regions']:
+            active_regions.add(r['uuid'])
+
+    region_uuid_lookup = {r['uuid']: r['name'] for r in regions}
+    species_uuid_lookup = {r['uuid']: r['name'] for r in species}
+
+
+    for r in regions:
+        if r['uuid'] in active_regions:
+            if r['type'] == 'cyt':
+                result += '{name} = rxd.Region(h.allsec(), nrn_region="i", name="{name}", geometry=rxd.FractionalVolume(volume_fraction={volumefraction}, neighbor_areas_fraction={volumefraction}, surface_fraction=1))\n'.format(**r)
+            elif r['type'] == 'extracellular':
+                result += '{name} = rxd.Extracellular(xlo=-500, ylo=-500, xhi=500, yhi=500, zlo=-500, zhi=500, dx={dx}, name="{name}", volume_fraction={volumefraction}, tortuosity={tortuosity})\n'.format(**r)
+            else:
+                result += '{name} = rxd.Region(h.allsec(), name="{name}", geometry=rxd.FractionalVolume(volume_fraction={volumefraction}, neighbor_areas_fraction={volumefraction}, surface_fraction=0))\n'.format(**r)
+
+    for sp in species:
+        if sp['regions']:
+            if len(sp['regions']) > 1:
+                print('warning: currently ignoring non-uniform d, initial and just using the first value')
+            d = sp['regions'][0]['d']
+            initial = sp['regions'][0]['initial']
+            sp_copy = dict(sp)
+            sp_copy['my_regions'] = '[' + ','.join(region_uuid_lookup[r['uuid']] for r in sp['regions']) + ']'
+            sp_copy['d'] = d
+            sp_copy['initial'] = initial
+            result += '{name} = rxd.Species({my_regions}, charge={charge}, name="{name}", d={d}, initial={initial})\n'.format(**sp_copy)
+            for r in sp['regions']:
+                if r['rate']:
+                    data = {
+                        'my_region':region_uuid_lookup[r['uuid']],
+                        'name': sp['name'],
+                        'rate': r['rate']
+                    }
+                    result += '{name}_{my_region}_rate = rxd.Rate({name}[{my_region}], {rate})\n'.format(**data)
+
+    for r in reactions:
+        r['custom_dynamics'] = not(r['mass_action'])
+        if r['states']:
+            print('Warning: reaction states currently ignored')
+        if r['all_regions']:
+            reactants = '+'.join('{}*{}'.format(s['stoichiometry'], species_uuid_lookup[s['uuid']]) for s in r['sources'])
+            products = '+'.join('{}*{}'.format(s['stoichiometry'], species_uuid_lookup[s['uuid']]) for s in r['dests'])
+            data = {
+                'custom_dynamics': not(r['mass_action']),
+                'reactants': reactants,
+                'products': products,
+                'name': r['name'],
+                'kf': r['kf'],
+                'kb': r['kb']
+            }
+            result += '{name} = rxd.Reaction({reactants}, {products}, {kf}, {kb}, custom_dynamics={custom_dynamics})\n'.format(**data)
+        else:
+            # check to see if multi-compartment or regular
+            involved_regions = set()
+            for s in r['sources']:
+                involved_regions.add(s['region'])
+            for s in r['dests']:
+                involved_regions.add(s['region'])
+            if len(involved_regions) > 1:
+                # multicompartment reaction
+                print('warning: multicompartment reactions currently unsupported')
+            else:
+                # single specific compartment reaction
+                reactants = '+'.join('{}*{}'.format(s['stoichiometry'], species_uuid_lookup[s['uuid']]) for s in r['sources'])
+                products = '+'.join('{}*{}'.format(s['stoichiometry'], species_uuid_lookup[s['uuid']]) for s in r['dests'])
+                data = {
+                    'custom_dynamics': not(r['mass_action']),
+                    'reactants': reactants,
+                    'products': products,
+                    'name': r['name'],
+                    'kf': r['kf'],
+                    'kb': r['kb'],
+                    'region': region_uuid_lookup[s['region']]
+                }
+                result += '{name} = rxd.Reaction({reactants}, {products}, {kf}, {kb}, custom_dynamics={custom_dynamics}, regions=[{region}])\n'.format(**data)
+
+    return result
 
 
 _all_windows = []
@@ -530,10 +631,10 @@ def make_terminal():
     shell.prompt()
     window.Show(True) 
 
-def make_browser_html(html, user_mappings={}, title='', size=(600, 400)):
+def make_browser_html(html, user_mappings={}, title='', size=(600, 400), custom_menus={}):
     global browser_created_count
     browser_created_count += 1
-    frame = NEURONWindow(user_mappings=user_mappings, html=html, title=title, size=size)
+    frame = NEURONWindow(user_mappings=user_mappings, html=html, title=title, size=size, custom_menus=custom_menus)
     frame.Show()
     _all_windows.append(frame)
     return frame
