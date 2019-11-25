@@ -1,4 +1,4 @@
-# browser code very lightly adapted from
+# browser code adapted from
 # https://github.com/cztomczak/cefpython/blob/master/examples/wxpython.py
 
 import wx
@@ -16,6 +16,9 @@ import webbrowser
 from weakref import WeakValueDictionary
 from neuron import h, nrn_dll_sym
 from neuron.units import ms, mV
+from neuron import hoc
+
+HocObject = hoc.HocObject
 
 h.load_file('stdrun.hoc')
 
@@ -197,7 +200,9 @@ class NEURONFrame(wx.Frame):
         tool_menu = wx.Menu()
         run_button_menuitem = tool_menu.Append(11, "Run Button")
         self.Bind(wx.EVT_MENU, show_run_button, run_button_menuitem)
-        
+        run_control_menuitem = tool_menu.Append(12, "Run Control")
+        self.Bind(wx.EVT_MENU, show_run_control, run_control_menuitem)
+
         menubar = wx.MenuBar()
         menubar.Append(filemenu, "&File")
         menubar.Append(build_menu, "&Build")
@@ -448,12 +453,56 @@ def make_voltage_axis_standalone():
     return make_browser_html(html, user_mappings={'seg': h.cas()(0.5)}, title='Voltage axis', size=(300, 300))
 
 def show_run_button(*args):
-    h.load_file('stdrun.hoc')
     html = '<button data-onclick="run()" style="width:100%; height:100vh; position: absolute; left:0; top:0">Init & Run</button>'
     return make_browser_html(html,
         user_mappings={'run': h.run},
         title='Run Button',
         size=(100, 50))
+
+def show_run_control(event):
+    return RunControl()
+
+
+class RunControl:
+    def __init__(self):
+        html = """
+        <table style="width:100%">
+            <tr><td><button data-onclick="init()">Init (mV)</button></td><td><input type="number" data-variable="v_init"></input></tr>
+            <tr><td><button data-onclick="run()">Init & run</button></td></tr>
+            <tr><td><button data-onclick="stopbutton()">Stop</button></td></tr>
+            <tr><td><button data-onclick="do_continue_until()">Continue until (ms)</button></td><td><input type="number" data-variable="continue_til"></input></tr>
+            <tr><td><button data-onclick="do_continue_for()">Continue for (ms)</button></td><td><input type="number" data-variable="continue_for"></input></tr>
+            <tr><td><button data-onclick="fadvance()">Single Step</button></td></tr>
+            <tr><td>t (ms)</td><td><input type="number" data-variable="t"></input></tr>
+            <tr><td>tstop (ms)</td><td><input type="number" data-variable="tstop"></input></tr>
+            <tr><td>dt (ms)</td><td><input type="number" data-variable="dt"></input></tr>
+            <tr><td>Real Time (s)</td><td><input type="number" data-variable="realtime" disabled></input></tr>
+        </table>
+        """
+        self.my_continue_til = h.ref(5)
+        self.my_continue_for = h.ref(1)
+        user_mappings = {
+            'v_init': h._ref_v_init,
+            'continue_til': self.my_continue_til,
+            'continue_for': self.my_continue_for,
+            't': h._ref_t,
+            'tstop': h._ref_tstop,
+            'dt': h._ref_dt,
+            'run': h.run,
+            'init': h.stdinit,
+            'fadvance': h.fadvance,
+            'realtime': h._ref_realtime,
+            'stopbutton': self.stop,
+            'do_continue_until': lambda: h.continuerun(self.my_continue_til[0]),
+            'do_continue_for': lambda: h.continuerun(h.t + self.my_continue_for[0])
+        }
+        self._frame = make_browser_html(html,
+            user_mappings=user_mappings,
+            title='Run Control',
+            size=(300, 280))
+    
+    def stop(self):
+        h.stoprun = True
 
 
 class RxDBuilder:
@@ -709,11 +758,20 @@ def lookup(this_browser, variable, action, newValue=None):
     split = variable.split('.')
     if len(split) == 1:
         # single variable
+        # TODO: just because something is a HocObject doesn't mean it's a pointer
+        # TODO: would it be faster to separate ptrs from not pointers in advance?
+        #       (maybe, maybe not)
         if variable in mappings.keys():
             if action == "get":
-                return mappings.get(variable)
-            elif action =="set":
-                mappings[variable] = newValue
+                result = mappings.get(variable)
+                if isinstance(result, HocObject):
+                    return result[0]
+                return result
+            elif action == "set":
+                if isinstance(mappings[variable], HocObject):
+                    mappings[variable][0] = newValue
+                else:
+                    mappings[variable] = newValue
         elif variable in shared_locals.keys():
             if action == "get":
                 return shared_locals.get(variable)
