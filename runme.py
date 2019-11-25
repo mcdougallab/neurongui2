@@ -19,6 +19,7 @@ from neuron.units import ms, mV
 from neuron import hoc
 
 HocObject = hoc.HocObject
+base_path = os.path.split(__file__)[0]
 
 h.load_file('stdrun.hoc')
 
@@ -240,14 +241,17 @@ class NEURONWindow(NEURONFrame):
         else:
             my_html = html
 
-        with open("main_script.html") as f:
+        with open(os.path.join(base_path, "main_script.html")) as f:
             my_wrapper_html = f.read()
+        
+        with open(os.path.join(base_path, 'js', 'plotshape.js')) as f:
+            plotshape_js = f.read()
 
-        with open(os.path.join(os.path.split(__file__)[0], 'js', 'setup_threejs.js')) as f:
+        with open(os.path.join(base_path, 'js', 'setup_threejs.js')) as f:
             three_js_stuff = f.read()
 
         self.wrapper_html = my_wrapper_html.replace("HTML_GOES_HERE", my_html)
-        self.wrapper_html = self.wrapper_html.replace('DECLARE_THREE_JS_HERE', three_js_stuff)
+        self.wrapper_html = self.wrapper_html.replace('DECLARE_THREE_JS_HERE', three_js_stuff).replace('DECLARE_PLOTSHAPE_CODE', plotshape_js)
 
         # Must ignore X11 errors like 'BadWindow' and others by
         # installing X11 error handlers. This must be done after
@@ -514,7 +518,7 @@ class RxDBuilder:
         self._active_regions = []
         self._active_species = []
         self._active_reactions = []
-        with open(os.path.join(os.path.split(__file__)[0], 'html', 'rxdbuilder.html')) as f:
+        with open(os.path.join(base_path, 'html', 'rxdbuilder.html')) as f:
             html = f.read()
         my_menu = wx.Menu()
         m_save = my_menu.Append(8, "Save model")
