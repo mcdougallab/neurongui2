@@ -128,9 +128,6 @@ def scale_window_size_for_high_dpi(width, height):
 
 class NEURONFrame(wx.Frame):
     def voltage_axis(self, *args, **kwargs):
-        print('voltage_axis')
-        print('args:', args)
-        print('kwargs:', kwargs)
         make_voltage_axis_standalone()
 
     def run_script(self, *args, **kwargs):
@@ -172,7 +169,7 @@ class NEURONFrame(wx.Frame):
         filemenu = wx.Menu()
         run_script_menuitem = filemenu.Append(1, "&Run script\tCtrl+O")
         self.Bind(wx.EVT_MENU, self.run_script, run_script_menuitem)
-        exit_menuitem = filemenu.Append(wx.ID_EXIT, "E&xit")
+        exit_menuitem = filemenu.Append(wx.ID_EXIT, "E&xit\tCtrl+Q")
         self.Bind(wx.EVT_MENU, self.exit, exit_menuitem)
         graph_menu = wx.Menu()
         voltage_axis_menuitem = graph_menu.Append(2, "&Voltage Axis")
@@ -182,7 +179,7 @@ class NEURONFrame(wx.Frame):
         tutorials_menuitem = help_menu.Append(4, "Tutorials")
         forum_menuitem = help_menu.Append(5, "NEURON Forum")
         models_menuitem = help_menu.Append(6, "NEURON Models on ModelDB")
-        self.Bind(wx.EVT_MENU, 
+        self.Bind(wx.EVT_MENU,
                 lambda *args: webbrowser.open('https://www.neuron.yale.edu/neuron/static/py_doc/index.html'),
                 progref_menuitem)
         self.Bind(wx.EVT_MENU,
@@ -514,7 +511,7 @@ def _flag_browser_ready(browser_id):
     browser_weakvaldict[browser_id].ready_status = 1
 
 def lookup(this_browser, variable, action, newValue=None):
-    mappings =  this_browser.user_mappings
+    mappings = this_browser.user_mappings
     # repeated process to check for a variable in a particular browser's mappings and then shared_locals
     # action can be "get" or "set"; newValue is value to set
     split = variable.split('.')
@@ -532,6 +529,7 @@ def lookup(this_browser, variable, action, newValue=None):
                 shared_locals[variable] = newValue
         else:
             print("unknown variable: ", variable)
+            current_shell.prompt()
             return None
     else:
         # if it's an attribute of an object
@@ -548,6 +546,7 @@ def lookup(this_browser, variable, action, newValue=None):
                 setattr(shared_locals[obj], attribute, newValue)
         else:
             print("unknown variable: ", variable)
+            current_shell.prompt()
             return None
 
 def lookup_graph_var(this_browser, variable):
@@ -561,6 +560,7 @@ def lookup_graph_var(this_browser, variable):
         return getattr(shared_locals[obj], "_ref_"+attribute)
     else:
         print("unknown variable: ", variable)
+        current_shell.prompt()
         return None
 
 def _update_vars(browser_id, variable, value):
