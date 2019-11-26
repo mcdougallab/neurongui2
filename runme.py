@@ -485,9 +485,16 @@ def make_voltage_axis_standalone():
 
 def make_shapeplot_standalone(*args, **kwargs):
     html = """
-        <div class="shapeplot" style="width:100vw; height:100vh;"></div>
+        <div class="shapeplot" data-mode='1' style="width:100vw; height:100vh;"></div>
     """
-    return make_browser_html(html, title='Shape plot', size=(300, 300))
+    my_menu = wx.Menu()
+    show_diam_menuitem = my_menu.AppendCheckItem(1, "Show Diam")
+    my_frame = make_browser_html(html, title='Shape plot', size=(300, 300), custom_menus={'ShapePlot': my_menu})
+    def toggle_show_diam(*args, **kwargs):
+        # TODO: this isn't a toggle... we should actually use the toggle menu item type
+        my_frame.browser.ExecuteJavascript("$('.shapeplot').attr('data-mode', 1 - $('.shapeplot').attr('data-mode')); for (var sp of _shape_plots) {sp.force_update()};")
+    my_frame.Bind(wx.EVT_MENU, toggle_show_diam, show_diam_menuitem)
+    return my_frame
 
 def show_run_button(*args):
     html = '<button data-onclick="run()" style="width:100%; height:100vh; position: absolute; left:0; top:0">Init & Run</button>'

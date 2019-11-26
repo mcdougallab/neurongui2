@@ -9,7 +9,6 @@ function set_neuron_section_data(new_data) {
 
 function ShapePlot(container) {
     this.diam_scale = 1;
-    this.mode = 1;
     this.tc = new ThreeContainer(container);
     this.container = container;
     this.section_data = undefined;
@@ -22,7 +21,10 @@ ShapePlot.prototype.update = function() {
         this.section_data = neuron_section_data;
         this.tc.onContainerResize();
         this.tc.clearLines();
-        var my_mode = this.mode;
+        var my_mode = this.container.attr('data-mode');
+        if (my_mode == undefined) {
+            my_mode = 1;
+        }
         function const_function(val) {
             return function(p) {return val};
         }
@@ -59,7 +61,7 @@ ShapePlot.prototype.update = function() {
             for(var j = 0 ; j < xs.length; j++) {
                 geo.vertices.push(new THREE.Vector3(xs[j], ys[j], zs[j]));
             }
-            if (this.mode == 0) {
+            if (my_mode == 0) {
                 my_width_rule = sp_interpolater(arcs, ds, 4 * this.diam_scale);
             } else {
                 my_width_rule = const_diam_f;
