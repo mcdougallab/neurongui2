@@ -921,7 +921,6 @@ def _update_browser_vars(this_browser, locals_copy):
         this_browser._last_diam_change_count = _diam_change_count.value
         this_browser._last_structure_change_count = _structure_change_count.value
         #print('structure changed')
-        current_shell.prompt()
         this_browser._do_reset_geometry()
 
 

@@ -20,6 +20,7 @@ function ShapePlot(container) {
 ShapePlot.prototype.update = function() {
     if (this.section_data !== neuron_section_data) {
         this.section_data = neuron_section_data;
+        this.tc.onContainerResize();
         this.tc.clearLines();
         var my_mode = this.mode;
         function const_function(val) {
