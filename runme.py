@@ -150,6 +150,30 @@ class NEURONFrame(wx.Frame):
     def voltage_axis(self, *args, **kwargs):
         make_voltage_axis_standalone()
 
+    def import3d(self, *args, **kwargs):
+        # TODO: we clear entire commands from the shell before running the script
+        #       but only restore the active
+        with wx.FileDialog(self,
+                        'Import SWC',
+                        wildcard="SWC (*.swc)|*.swc",
+                        style=wx.FD_OPEN|wx.FD_FILE_MUST_EXIST) as file_dialog:
+            if file_dialog.ShowModal() == wx.ID_CANCEL:
+                return  # cancelled
+            path = file_dialog.GetPath()
+        extension = os.path.splitext(path)[1]
+        # TODO: add support for asc, etc
+        assert(extension == '.swc')
+        old_command = current_shell.getCommand()
+        current_shell.clearCommand()
+        current_shell.write('\n')
+        h.load_file('stdlib.hoc')
+        h.load_file('import3d.hoc')
+        reader = h.Import3d_SWC_read()
+        reader.input(path)
+        h.Import3d_GUI(reader, False).instantiate(None)
+        current_shell.prompt()
+        current_shell.write(old_command)
+
     def run_script(self, *args, **kwargs):
         # TODO: we clear entire commands from the shell before running the script
         #       but only restore the active
@@ -191,6 +215,9 @@ class NEURONFrame(wx.Frame):
         self.Bind(wx.EVT_MENU, make_terminal, new_pyterminal_menuitem)
         run_script_menuitem = filemenu.Append(_menu_id(), "&Run script\tCtrl+O")
         self.Bind(wx.EVT_MENU, self.run_script, run_script_menuitem)
+        # TODO: make this a generic Import3D tool... and handle errors
+        import3d_menuitem = filemenu.Append(_menu_id(), "&Import SWC\tCtrl+I")
+        self.Bind(wx.EVT_MENU, self.import3d, import3d_menuitem)
         exit_menuitem = filemenu.Append(wx.ID_EXIT, "E&xit\tCtrl+Q")
         self.Bind(wx.EVT_MENU, self.exit, exit_menuitem)
         graph_menu = wx.Menu()
@@ -499,6 +526,8 @@ def make_voltage_axis_standalone():
 
 _shapeplot_menus = []
 
+# TODO: there is a decent amount of latency on recalculating a cell with "real" morphology; e.g. c91662
+#       rotates, etc, smoothly but toggling show-diam, etc
 def make_shapeplot_standalone(*args, **kwargs):
     html = """
         <div class="shapeplot" data-mode='1' style="width:100vw; height:100vh;"></div>
