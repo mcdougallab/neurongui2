@@ -2,13 +2,16 @@ var neuron_section_data = undefined;
 
 function set_neuron_section_data(new_data) {
     neuron_section_data = new_data;
+    for(sp of _shape_plots) {
+        sp.update();
+    }
 }
 
-function ShapePlot(container_name) {
+function ShapePlot(container) {
     this.diam_scale = 1;
     this.mode = 1;
-    this.tc = new ThreeContainer(container_name);
-    this.container = $('#' + container_name);
+    this.tc = new ThreeContainer(container);
+    this.container = container;
     this.section_data = undefined;
     this.vmin = -100;
     this.vmax = 100;

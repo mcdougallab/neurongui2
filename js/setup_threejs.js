@@ -49032,10 +49032,11 @@ else {
 
 
 
-function ThreeContainer(container_name) {
-    this.width = $('#' + container_name).width();
-    this.height = $('#' + container_name).height();
-    this.container = document.getElementById(container_name);
+function ThreeContainer(container) {
+    this.width = container.width();
+    this.height = container.height();
+    // NOTE: this assumes only one entry in container
+    this.container = container[0];
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(60, this.width / this.height, .01, 10000); //OrthographicCamera(this.width / -2, this.width / 2, this.height / -2, this.height / 2, 1, 1000) // 
     this.camera.position.set(0, 0, 500);
@@ -49048,7 +49049,7 @@ function ThreeContainer(container_name) {
     this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
 
     this.lines = [];
-    $('#' + container_name).resize(this.onContainerResize);
+    container.resize(this.onContainerResize);
     console.log('ThreeContainer', this);
     this.init();
     return this;

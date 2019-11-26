@@ -75,6 +75,15 @@ function update_html_variable_displays(changed, deleted) {
     });
 }
 
+var _shape_plots = [];
+$(function() {
+    _shape_plots = [];
+    // setup ShapePlots, if any
+    $("div[class='shapeplot']").each(function(i, elem) {
+        _shape_plots.push(new ShapePlot($(elem)));
+    });
+});
+
 var my_gv;
 var window_resize_timeout;
 
@@ -85,8 +94,11 @@ $(window).resize(function () {
         if (my_gv !== undefined) {
             // TODO: check with Lia if this will work when there was an update
             update_graph_vectors(my_gv, 'make');
-            // TODO: shape plots and other things may need updated here too
+            // shape plots
         }
+        for (var sp of _shape_plots) {
+            sp.tc.onContainerResize();
+        }        
     }, 100);
 });
 

@@ -18,9 +18,16 @@ from neuron import h, nrn_dll_sym
 from neuron.units import ms, mV
 from neuron import hoc
 from neuron.gui2.utilities import _segment_3d_pts
+import neuron
+import ctypes
 
 HocObject = hoc.HocObject
 base_path = os.path.split(__file__)[0]
+
+_structure_change_count = neuron.nrn_dll_sym('structure_change_cnt', ctypes.c_int)
+_diam_change_count = neuron.nrn_dll_sym('diam_change_cnt', ctypes.c_int)
+_last_diam_change_count = _diam_change_count.value
+_last_structure_change_count = _structure_change_count.value
 
 h.load_file('stdrun.hoc')
 
@@ -178,6 +185,8 @@ class NEURONFrame(wx.Frame):
         graph_menu = wx.Menu()
         voltage_axis_menuitem = graph_menu.Append(2, "&Voltage Axis")
         self.Bind(wx.EVT_MENU, self.voltage_axis, voltage_axis_menuitem)
+        shapeplot_menuitem = graph_menu.Append(2, "&Shape Plot")
+        self.Bind(wx.EVT_MENU, make_shapeplot_standalone, shapeplot_menuitem)
         help_menu = wx.Menu()
         progref_menuitem = help_menu.Append(3, "Programmer's Reference")
         tutorials_menuitem = help_menu.Append(4, "Tutorials")
@@ -220,7 +229,6 @@ class NEURONFrame(wx.Frame):
         self.SetMenuBar(menubar)
 
 class NEURONWindow(NEURONFrame):
-
     def __init__(self, html_file=None, user_mappings={}, html=None, title='', size=(600, 400), custom_menus={}):
         self.browser = None
         self.html_file = html_file
@@ -232,6 +240,10 @@ class NEURONWindow(NEURONFrame):
         self.ready_status = 1   #browser sends signal that it's ready when done updating graphs
         self.data_waiting = None    #graph data waiting for browser to be ready
         self.t_tracker_vec = "h.t"  #which vector to use for graph tracking
+
+        # used for tracking when shape plots (if any) need updating
+        self._last_diam_change_count = None
+        self._last_structure_change_count = None
 
         if html_file is not None and html is not None:
             raise Exception("specify either html_file or html")
@@ -317,7 +329,7 @@ class NEURONWindow(NEURONFrame):
         geo = []
         for sec in secs:
             geo += _segment_3d_pts(sec)
-        # TODO: javascript_embedder(("set_neuron_section_data(%s);" % json.dumps(geo))) 
+        self.browser.ExecuteJavascript("set_neuron_section_data(%s);" % json.dumps(geo))
 
     def embed_browser(self):
         global browser_created_count, browser_weakvaldict
@@ -380,7 +392,9 @@ class NEURONWindow(NEURONFrame):
             self.Destroy()
             global g_count_windows
             g_count_windows -= 1
-            if g_count_windows == 0:
+            # disabling shutting down when browser frames (but not terminals) are all closed
+            # TODO: something better
+            if False and g_count_windows == 0:
                 cef.Shutdown()
                 wx.GetApp().ExitMainLoop()
                 # Call _exit otherwise app exits with code 255 (Issue #162).
@@ -468,6 +482,12 @@ def make_voltage_axis_standalone():
         current_shell.prompt()
         return
     return make_browser_html(html, user_mappings={'seg': h.cas()(0.5)}, title='Voltage axis', size=(300, 300))
+
+def make_shapeplot_standalone(*args, **kwargs):
+    html = """
+        <div class="shapeplot" style="width:100vw; height:100vh;"></div>
+    """
+    return make_browser_html(html, title='Shape plot', size=(300, 300))
 
 def show_run_button(*args):
     html = '<button data-onclick="run()" style="width:100%; height:100vh; position: absolute; left:0; top:0">Init & Run</button>'
@@ -758,6 +778,7 @@ def monitor_browser_vars(this_browser):
 def _print_to_terminal():
     # experimental info relayed to terminal from browser action
     print("So this worked.")
+    current_shell.prompt()
 
 def _py_function_handler(browser_id, function_string):
     global browser_weakvaldict 
@@ -891,7 +912,19 @@ def send_graph_vars(this_browser, action):
             to_send[k] = list(graph_vars[k])[this_browser.t_tracker:]  # only the new data
     this_browser.browser.ExecuteJavascript("update_graph_vectors({}, {})".format(json.dumps(to_send), json.dumps([action])))
 
-def _update_browser_vars(this_browser, locals_copy):  
+def _update_browser_vars(this_browser, locals_copy):
+    # check for changes to the morphology
+    old_diam_changed = h.diam_changed
+    h.define_shape()
+    if old_diam_changed or h.diam_changed or _diam_change_count.value != this_browser._last_diam_change_count or _structure_change_count.value != this_browser._last_structure_change_count:
+        h.doNotify()
+        this_browser._last_diam_change_count = _diam_change_count.value
+        this_browser._last_structure_change_count = _structure_change_count.value
+        #print('structure changed')
+        current_shell.prompt()
+        this_browser._do_reset_geometry()
+
+
     # create dictionary of the changed variables 
     changed_vars, deleted_vars = find_changed_vars(this_browser, locals_copy)
     locals_copy.update(changed_vars)
