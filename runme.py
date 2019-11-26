@@ -18,6 +18,7 @@ from neuron import h, nrn_dll_sym
 from neuron.units import ms, mV
 from neuron import hoc
 from neuron.gui2.utilities import _segment_3d_pts
+from neuron.gui2.rangevar import rangevars_present
 import neuron
 import ctypes
 
@@ -138,6 +139,13 @@ def scale_window_size_for_high_dpi(width, height):
         height = max_height
     return width, height
 
+_menu_ct = 0
+def _menu_id():
+    """don't repeat a menu id"""
+    global _menu_ct
+    _menu_ct += 1
+    return _menu_ct
+
 class NEURONFrame(wx.Frame):
     def voltage_axis(self, *args, **kwargs):
         make_voltage_axis_standalone()
@@ -178,20 +186,23 @@ class NEURONFrame(wx.Frame):
 
     def create_menu(self, custom_menus={}):
         filemenu = wx.Menu()
-        run_script_menuitem = filemenu.Append(1, "&Run script\tCtrl+O")
+        # TODO: allow New HOC terminal -- can specify interpreter when creating a pyshell... also need to override prompt and line-end detection with HOC rules
+        new_pyterminal_menuitem = filemenu.Append(_menu_id(), "&New Python terminal\tCtrl+N")
+        self.Bind(wx.EVT_MENU, make_terminal, new_pyterminal_menuitem)
+        run_script_menuitem = filemenu.Append(_menu_id(), "&Run script\tCtrl+O")
         self.Bind(wx.EVT_MENU, self.run_script, run_script_menuitem)
         exit_menuitem = filemenu.Append(wx.ID_EXIT, "E&xit\tCtrl+Q")
         self.Bind(wx.EVT_MENU, self.exit, exit_menuitem)
         graph_menu = wx.Menu()
-        voltage_axis_menuitem = graph_menu.Append(2, "&Voltage Axis")
+        voltage_axis_menuitem = graph_menu.Append(_menu_id(), "&Voltage Axis")
         self.Bind(wx.EVT_MENU, self.voltage_axis, voltage_axis_menuitem)
-        shapeplot_menuitem = graph_menu.Append(2, "&Shape Plot")
+        shapeplot_menuitem = graph_menu.Append(_menu_id(), "&Shape Plot")
         self.Bind(wx.EVT_MENU, make_shapeplot_standalone, shapeplot_menuitem)
         help_menu = wx.Menu()
-        progref_menuitem = help_menu.Append(3, "Programmer's Reference")
-        tutorials_menuitem = help_menu.Append(4, "Tutorials")
-        forum_menuitem = help_menu.Append(5, "NEURON Forum")
-        models_menuitem = help_menu.Append(6, "NEURON Models on ModelDB")
+        progref_menuitem = help_menu.Append(_menu_id(), "Programmer's Reference")
+        tutorials_menuitem = help_menu.Append(_menu_id(), "Tutorials")
+        forum_menuitem = help_menu.Append(_menu_id(), "NEURON Forum")
+        models_menuitem = help_menu.Append(_menu_id(), "NEURON Models on ModelDB")
         self.Bind(wx.EVT_MENU,
                 lambda *args: webbrowser.open('https://www.neuron.yale.edu/neuron/static/py_doc/index.html'),
                 progref_menuitem)
@@ -205,13 +216,13 @@ class NEURONFrame(wx.Frame):
             lambda *args: webbrowser.open('https://senselab.med.yale.edu/ModelDB/ModelList.cshtml?id=1882'),
             models_menuitem)
         build_menu = wx.Menu()
-        rxdbuilder_menuitem = build_menu.Append(7, "RxD Builder")
+        rxdbuilder_menuitem = build_menu.Append(_menu_id(), "RxD Builder")
         self.Bind(wx.EVT_MENU, show_rxd_builder, rxdbuilder_menuitem)
 
         tool_menu = wx.Menu()
-        run_button_menuitem = tool_menu.Append(11, "Run Button")
+        run_button_menuitem = tool_menu.Append(_menu_id(), "Run Button")
         self.Bind(wx.EVT_MENU, show_run_button, run_button_menuitem)
-        run_control_menuitem = tool_menu.Append(12, "Run Control")
+        run_control_menuitem = tool_menu.Append(_menu_id(), "Run Control")
         self.Bind(wx.EVT_MENU, show_run_control, run_control_menuitem)
 
         menubar = wx.MenuBar()
@@ -360,6 +371,9 @@ class NEURONWindow(NEURONFrame):
         self.register_binding("_flag_browser_ready", _flag_browser_ready)
 
     def OnSetFocus(self, _):
+        # TODO: can we be smarter about when we update shapeplot menus?
+        _update_shapeplot_menus()
+
         if not self.browser:
             return
         if WINDOWS:
@@ -483,18 +497,42 @@ def make_voltage_axis_standalone():
         return
     return make_browser_html(html, user_mappings={'seg': h.cas()(0.5)}, title='Voltage axis', size=(300, 300))
 
+_shapeplot_menus = []
+
 def make_shapeplot_standalone(*args, **kwargs):
     html = """
         <div class="shapeplot" data-mode='1' style="width:100vw; height:100vh;"></div>
     """
     my_menu = wx.Menu()
-    show_diam_menuitem = my_menu.AppendCheckItem(1, "Show Diam")
+    show_diam_menuitem = my_menu.AppendCheckItem(_menu_id(), "Show Diam")
+    plotwhat_menu = wx.Menu()
+    plotwhat_menu.Append(_menu_id(), 'v')
+    my_menu.AppendSubMenu(plotwhat_menu, 'Plot What')
+    _shapeplot_menus.append(plotwhat_menu)
+    my_menu.AppendSeparator()
     my_frame = make_browser_html(html, title='Shape plot', size=(300, 300), custom_menus={'ShapePlot': my_menu})
     def toggle_show_diam(*args, **kwargs):
         # TODO: this isn't a toggle... we should actually use the toggle menu item type
         my_frame.browser.ExecuteJavascript("$('.shapeplot').attr('data-mode', 1 - $('.shapeplot').attr('data-mode')); for (var sp of _shape_plots) {sp.force_update()};")
     my_frame.Bind(wx.EVT_MENU, toggle_show_diam, show_diam_menuitem)
+    _update_shapeplot_menus()
     return my_frame
+
+def _update_shapeplot_menus(*args, **kwargs):
+    # TODO: should use checkboxes to show what (if anything) is currently plotted
+    #       this is part of why I didn't try to have a single plotwhat menu (since different selections)
+    #       no idea how that would have worked, anyway
+    # TODO: can we do this without destroying everything?
+    # TODO: if plotting different sections, should we treat the lists of allowed rangevars differently?
+    rangevars = rangevars_present(h.allsec())
+    for menu in _shapeplot_menus:
+        for item in menu.GetMenuItems():
+            menu.Delete(item)
+        for rangevar in rangevars:
+            menu.Append(_menu_id(), rangevar['name'])
+            # TODO: would need to somehow bind this to the frame or... something... 
+
+
 
 def show_run_button(*args):
     html = '<button data-onclick="run()" style="width:100%; height:100vh; position: absolute; left:0; top:0">Init & Run</button>'
@@ -557,9 +595,9 @@ class RxDBuilder:
         with open(os.path.join(base_path, 'html', 'rxdbuilder.html')) as f:
             html = f.read()
         my_menu = wx.Menu()
-        m_save = my_menu.Append(8, "Save model")
-        m_export_python = my_menu.Append(9, "Export to Python")
-        m_instantiate = my_menu.Append(10, 'Instantiate')
+        m_save = my_menu.Append(_menu_id(), "Save model")
+        m_export_python = my_menu.Append(_menu_id(), "Export to Python")
+        m_instantiate = my_menu.Append(_menu_id(), 'Instantiate')
         custom_menus = {'RxDBuilder': my_menu}
         self._frame = make_browser_html(html, title='RxD Builder', custom_menus=custom_menus)
         self._frame.register_binding("_update_data", self._update_data)
@@ -718,8 +756,7 @@ from neuron import h
 _all_windows = []
 current_shell = None
 
-# TODO: incorporate g_count_windows logic
-def make_terminal():
+def make_terminal(*args, **kwargs):
     global current_shell
     window = NEURONFrame(None, title="Console [{}]".format(len(_all_windows) + 1), size=(600, 400))
     # by explicitly specifying the locals, we couple the shells together
@@ -733,7 +770,7 @@ def make_terminal():
     current_shell.redirectStdout(True)
     current_shell.redirectStdin(True)
     current_shell.redirectStderr(True)
-    shell.write("\nType make_terminal() or setupSim() or quit()\n")
+    shell.write("\nType setupSim() or quit() or use the menus or use NEURON as usual\n")
     shell.prompt()
     window.Show(True) 
 
@@ -928,7 +965,10 @@ def _update_browser_vars(this_browser, locals_copy):
         this_browser._last_diam_change_count = _diam_change_count.value
         this_browser._last_structure_change_count = _structure_change_count.value
         #print('structure changed')
+        # TODO: monitor for the presence of a shape plot... only do this when there actually is one
         this_browser._do_reset_geometry()
+        # TODO: do this only for this browser's menu; this will eliminate the need for the for loop in _update_shapeplot_menus
+        _update_shapeplot_menus()
 
 
     # create dictionary of the changed variables 
@@ -959,7 +999,7 @@ def _update_browser_vars(this_browser, locals_copy):
 def setupSim():
     shared_locals['shell'].runfile('setup.txt')
 
-shared_locals = {'make_terminal': make_terminal, 'make_browser': make_browser, 'quit': sys.exit, 'delete_var':delete_var,
+shared_locals = {'make_browser': make_browser, 'quit': sys.exit, 'delete_var':delete_var,
 'weakdict':browser_weakvaldict, 'sim': lambda: make_browser("simulation1.html"), 'setupSim':setupSim}
 
 # todo: should this be here or in main
