@@ -179,7 +179,7 @@ class NEURONFrame(wx.Frame):
         #       but only restore the active
         with wx.FileDialog(self,
                         'Select script to run',
-                        wildcard="All runnable files (*.py; *.hoc; *.ses)|*.py;*.hoc;*.ses|Python files (*.py);*.py|HOC files (*.hoc);*.hoc|Session files (*.ses);*.ses",
+                        wildcard="All runnable files (*.py; *.hoc; *.ses)|*.py;*.hoc;*.ses|Python files (*.py)|*.py|HOC files (*.hoc)|*.hoc|Session files (*.ses)|*.ses",
                         style=wx.FD_OPEN|wx.FD_FILE_MUST_EXIST) as file_dialog:
             if file_dialog.ShowModal() == wx.ID_CANCEL:
                 return  # cancelled
