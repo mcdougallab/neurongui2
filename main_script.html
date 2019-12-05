@@ -7,6 +7,8 @@
         <meta charset="utf-8">
         <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
         <script src="https://d3js.org/d3.v5.min.js"></script>
+        <script>DECLARE_THREE_JS_HERE</script>
+        <script>DECLARE_PLOTSHAPE_CODE</script>
     </head>
 <body>
 
@@ -73,14 +75,44 @@ function update_html_variable_displays(changed, deleted) {
     });
 }
 
+var _shape_plots = [];
+$(function() {
+    _shape_plots = [];
+    // setup ShapePlots, if any
+    $("div[class='shapeplot']").each(function(i, elem) {
+        _shape_plots.push(new ShapePlot($(elem)));
+    });
+});
+
+var my_gv;
+var window_resize_timeout;
+
+$(window).resize(function () {
+    clearTimeout(window_resize_timeout);
+    // only redraw things if haven't resized in 100ms
+    window_resize_timeout = setTimeout(function() {
+        if (my_gv !== undefined) {
+            // TODO: check with Lia if this will work when there was an update
+            update_graph_vectors(my_gv, 'make');
+            // shape plots
+        }
+        for (var sp of _shape_plots) {
+            sp.tc.onContainerResize();
+        }        
+    }, 100);
+});
+
 function update_graph_vectors(graph_vars, action) {
     // update graph vector plots
     // assumes that vars have only been sent if all vectors have changed or been reinitialized
     // action determines if making or updating plots
+    console.log('action', action);
+    my_gv = graph_vars;
     d3.selectAll("div[class='lineplot']").each( function () {
         var id = $(this).attr('id');
         var x_var = $(this).attr('data-x-var');
         console.log(graph_vars[x_var].length);
+
         if (graph_vars[x_var].length > 0) {
 
             var y_vars = $(this).attr('data-y-var').split(';');
@@ -135,15 +167,18 @@ $('input').keypress(function(event){
 $('input').focusout(function() {   // also update if focus is lost on input
     _update_vars(browser_id, $(this).attr('data-variable'), $(this).val())
 });
-
+$('input:checkbox').change(function() {   // also update if focus is lost on input
+    _update_vars(browser_id, $(this).attr('data-variable'), $(this).is(':checked'))
+});
 function make_barplot(dat, object) {
 
     var div = d3.select(object);
+    var div_jquery = $(object);
     // clear a previous plot
     div.select("svg").remove();
 
-    var w = parseFloat(div.style("width").replace("px", ""));
-    var h = parseFloat(div.style("height").replace("px", ""));
+    var w = div_jquery.width();
+    var h = div_jquery.height();
     var svg = div.append("svg").attr("width", w).attr("height", h);
 
     var xscale = d3.scaleLinear()
@@ -184,12 +219,13 @@ function make_lineplot(dat, object, dims) {
     // have a list (TODO: limitless?) to generate different colors depending on number of series to plot
     var colorpick = ["steelblue", "red", "yellow", "green"];
     var div = d3.select(object);
+    var div_jquery = $(object);
      
     var xlabel = $(object).attr("data-xlab");
     var ylabel = $(object).attr("data-ylab");
 
-    var w = parseFloat(div.style("width").replace("px", ""));
-    var h = parseFloat(div.style("height").replace("px", ""));
+    var w = div_jquery.width();
+    var h = div_jquery.height();
     var margin = 50;
 
     div.select("svg").remove();
@@ -302,6 +338,7 @@ function update_lineplot(object, x_var, y_vars, graph_vars) {
         var xmin = arrayMin(anyseries.map((k, i) => k[0]));
         var xmax = arrayMax(anyseries.map((k, i) => k[0]));
         // TODO: is it easier to do all the recalculation of dimensions just within the update_lineplot func?
+        // TODO: allow a data- for setting extrema
         var new_dims = [xmin, xmax, arrayMin(ymins), arrayMax(ymaxs)]; 
     
         var new_dat = lineplot_data;
@@ -310,9 +347,10 @@ function update_lineplot(object, x_var, y_vars, graph_vars) {
         var colorpick = ["steelblue", "red", "yellow", "green"];
         var div = d3.select(object);
         var svg = div.select("svg");
-
-        var w = parseFloat(div.style("width").replace("px", ""));
-        var h = parseFloat(div.style("height").replace("px", ""));
+        var div_jquery = $(object);
+    
+        var w = div_jquery.width();
+        var h = div_jquery.height();
         var margin = 50;
         var padding = Math.floor((new_dims[3]-new_dims[2])/10);
 

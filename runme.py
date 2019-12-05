@@ -1,4 +1,4 @@
-# browser code very lightly adapted from
+# browser code adapted from
 # https://github.com/cztomczak/cefpython/blob/master/examples/wxpython.py
 
 import wx
@@ -12,9 +12,23 @@ import threading
 import time
 import json
 import copy
+import webbrowser
 from weakref import WeakValueDictionary
 from neuron import h, nrn_dll_sym
 from neuron.units import ms, mV
+from neuron import hoc
+from neuron.gui2.utilities import _segment_3d_pts
+from neuron.gui2.rangevar import rangevars_present
+import neuron
+import ctypes
+
+HocObject = hoc.HocObject
+base_path = os.path.split(__file__)[0]
+
+_structure_change_count = neuron.nrn_dll_sym('structure_change_cnt', ctypes.c_int)
+_diam_change_count = neuron.nrn_dll_sym('diam_change_cnt', ctypes.c_int)
+_last_diam_change_count = _diam_change_count.value
+_last_structure_change_count = _structure_change_count.value
 
 h.load_file('stdrun.hoc')
 
@@ -79,6 +93,15 @@ def main():
         # the same time. This is an incorrect approach
         # and only a temporary fix.
         settings["external_message_pump"] = True
+
+        # argv[0] is used by default in Mac to populate the program menu
+        # e.g. Hide Neuron, Quit Neuron
+        sys.argv[0] = 'NEURON'
+
+        # TODO: apparently need to create an app to have the mac menubar program name say something other than python
+        # see https://stackoverflow.com/questions/12633100/changing-wxpython-app-mac-menu-bar-title
+        # This might not be a big deal, given that NEURON is already an app?
+
     if WINDOWS:
         # noinspection PyUnresolvedReferences, PyArgumentList
         cef.DpiAware.EnableHighDpiSupport()
@@ -116,10 +139,135 @@ def scale_window_size_for_high_dpi(width, height):
         height = max_height
     return width, height
 
+_menu_ct = 0
+def _menu_id():
+    """don't repeat a menu id"""
+    global _menu_ct
+    _menu_ct += 1
+    return _menu_ct
 
-class MainFrame(wx.Frame):
+class NEURONFrame(wx.Frame):
+    def voltage_axis(self, *args, **kwargs):
+        make_voltage_axis_standalone()
 
-    def __init__(self, html_file, user_mappings):
+    def import3d(self, *args, **kwargs):
+        # TODO: we clear entire commands from the shell before running the script
+        #       but only restore the active
+        with wx.FileDialog(self,
+                        'Import SWC',
+                        wildcard="SWC (*.swc)|*.swc",
+                        style=wx.FD_OPEN|wx.FD_FILE_MUST_EXIST) as file_dialog:
+            if file_dialog.ShowModal() == wx.ID_CANCEL:
+                return  # cancelled
+            path = file_dialog.GetPath()
+        extension = os.path.splitext(path)[1]
+        # TODO: add support for asc, etc
+        assert(extension == '.swc')
+        old_command = current_shell.getCommand()
+        current_shell.clearCommand()
+        current_shell.write('\n')
+        h.load_file('stdlib.hoc')
+        h.load_file('import3d.hoc')
+        reader = h.Import3d_SWC_read()
+        reader.input(path)
+        h.Import3d_GUI(reader, False).instantiate(None)
+        current_shell.prompt()
+        current_shell.write(old_command)
+
+    def run_script(self, *args, **kwargs):
+        # TODO: we clear entire commands from the shell before running the script
+        #       but only restore the active
+        with wx.FileDialog(self,
+                        'Select script to run',
+                        wildcard="All runnable files (*.py; *.hoc; *.ses)|*.py;*.hoc;*.ses|Python files (*.py);*.py|HOC files (*.hoc);*.hoc|Session files (*.ses);*.ses",
+                        style=wx.FD_OPEN|wx.FD_FILE_MUST_EXIST) as file_dialog:
+            if file_dialog.ShowModal() == wx.ID_CANCEL:
+                return  # cancelled
+            path = file_dialog.GetPath()
+        extension = os.path.splitext(path)[1]
+        # store the old command
+        #old_command = current_shell.getMultilineCommand()
+        old_command = current_shell.getCommand()
+        current_shell.clearCommand()
+        current_shell.write('\n')
+        if extension == '.py':
+            with open(path) as f:
+                code = compile(f.read(), path, 'exec')
+            current_shell.interp.runcode(code)
+        elif extension in ('.hoc', '.ses'):
+            # the True means it will always run, even if it has already been run
+            h.load_file(True, path)
+        else:
+            print('undefined file:', path)
+            # TODO: how should we handle "impossible" errors like this?
+        # restore the prompt state
+        current_shell.prompt()
+        current_shell.write(old_command)
+    
+    def exit(self, *args, **kwargs):
+        # TODO: put any are-you-sure questions here
+        sys.exit()
+
+    def create_menu(self, custom_menus={}):
+        filemenu = wx.Menu()
+        # TODO: allow New HOC terminal -- can specify interpreter when creating a pyshell... also need to override prompt and line-end detection with HOC rules
+        new_pyterminal_menuitem = filemenu.Append(_menu_id(), "&New Python terminal\tCtrl+N")
+        self.Bind(wx.EVT_MENU, make_terminal, new_pyterminal_menuitem)
+        run_script_menuitem = filemenu.Append(_menu_id(), "&Run script\tCtrl+O")
+        self.Bind(wx.EVT_MENU, self.run_script, run_script_menuitem)
+        # TODO: make this a generic Import3D tool... and handle errors
+        import3d_menuitem = filemenu.Append(_menu_id(), "&Import SWC\tCtrl+I")
+        self.Bind(wx.EVT_MENU, self.import3d, import3d_menuitem)
+        exit_menuitem = filemenu.Append(wx.ID_EXIT, "E&xit\tCtrl+Q")
+        self.Bind(wx.EVT_MENU, self.exit, exit_menuitem)
+        graph_menu = wx.Menu()
+        voltage_axis_menuitem = graph_menu.Append(_menu_id(), "&Voltage Axis")
+        self.Bind(wx.EVT_MENU, self.voltage_axis, voltage_axis_menuitem)
+        shapeplot_menuitem = graph_menu.Append(_menu_id(), "&Shape Plot")
+        self.Bind(wx.EVT_MENU, make_shapeplot_standalone, shapeplot_menuitem)
+        help_menu = wx.Menu()
+        progref_menuitem = help_menu.Append(_menu_id(), "Programmer's Reference")
+        tutorials_menuitem = help_menu.Append(_menu_id(), "Tutorials")
+        forum_menuitem = help_menu.Append(_menu_id(), "NEURON Forum")
+        models_menuitem = help_menu.Append(_menu_id(), "NEURON Models on ModelDB")
+        self.Bind(wx.EVT_MENU,
+                lambda *args: webbrowser.open('https://www.neuron.yale.edu/neuron/static/py_doc/index.html'),
+                progref_menuitem)
+        self.Bind(wx.EVT_MENU,
+            lambda *args: webbrowser.open('https://neuron.yale.edu/neuron/docs'),
+            tutorials_menuitem)
+        self.Bind(wx.EVT_MENU,
+            lambda *args: webbrowser.open('https://neuron.yale.edu/phpBB/'),
+            forum_menuitem)
+        self.Bind(wx.EVT_MENU,
+            lambda *args: webbrowser.open('https://senselab.med.yale.edu/ModelDB/ModelList.cshtml?id=1882'),
+            models_menuitem)
+        build_menu = wx.Menu()
+        rxdbuilder_menuitem = build_menu.Append(_menu_id(), "RxD Builder")
+        self.Bind(wx.EVT_MENU, show_rxd_builder, rxdbuilder_menuitem)
+
+        tool_menu = wx.Menu()
+        run_button_menuitem = tool_menu.Append(_menu_id(), "Run Button")
+        self.Bind(wx.EVT_MENU, show_run_button, run_button_menuitem)
+        run_control_menuitem = tool_menu.Append(_menu_id(), "Run Control")
+        self.Bind(wx.EVT_MENU, show_run_control, run_control_menuitem)
+
+        menubar = wx.MenuBar()
+        menubar.Append(filemenu, "&File")
+        menubar.Append(build_menu, "&Build")
+        menubar.Append(tool_menu, "&Tools")
+        menubar.Append(graph_menu, "&Graph")
+
+        # TODO: if menu_name already present, add items to existing menu instead
+        #       e.g. consider a repeated File menu
+        for menu_name, menu in custom_menus.items():
+            menubar.Append(menu, menu_name)
+
+        menubar.Append(help_menu, "&Help")
+        self.SetMenuBar(menubar)
+
+class NEURONWindow(NEURONFrame):
+    def __init__(self, html_file=None, user_mappings={}, html=None, title='', size=(600, 400), custom_menus={}):
         self.browser = None
         self.html_file = html_file
         self.user_mappings = user_mappings
@@ -131,12 +279,30 @@ class MainFrame(wx.Frame):
         self.data_waiting = None    #graph data waiting for browser to be ready
         self.t_tracker_vec = "h.t"  #which vector to use for graph tracking
 
-        with open(html_file) as f:
-            my_html = f.read()
-        with open("main_script.html") as f:
+        # used for tracking when shape plots (if any) need updating
+        self._last_diam_change_count = None
+        self._last_structure_change_count = None
+
+        if html_file is not None and html is not None:
+            raise Exception("specify either html_file or html")
+
+        if html is None:
+            with open(html_file) as f:
+                my_html = f.read()
+        else:
+            my_html = html
+
+        with open(os.path.join(base_path, "main_script.html")) as f:
             my_wrapper_html = f.read()
+        
+        with open(os.path.join(base_path, 'js', 'plotshape.js')) as f:
+            plotshape_js = f.read()
+
+        with open(os.path.join(base_path, 'js', 'setup_threejs.js')) as f:
+            three_js_stuff = f.read()
 
         self.wrapper_html = my_wrapper_html.replace("HTML_GOES_HERE", my_html)
+        self.wrapper_html = self.wrapper_html.replace('DECLARE_THREE_JS_HERE', three_js_stuff).replace('DECLARE_PLOTSHAPE_CODE', plotshape_js)
 
         # Must ignore X11 errors like 'BadWindow' and others by
         # installing X11 error handlers. This must be done after
@@ -147,13 +313,13 @@ class MainFrame(wx.Frame):
         global g_count_windows
         g_count_windows += 1
 
-        size = scale_window_size_for_high_dpi(WIDTH, HEIGHT)
+        size = scale_window_size_for_high_dpi(size[0], size[1])
 
         wx.Frame.__init__(self, parent=None, id=wx.ID_ANY,
-                          title='Simulation Window', size=size)
+                          title=title, size=size)
 
         self.setup_icon()
-        self.create_menu()
+        self.create_menu(custom_menus=custom_menus)
         self.Bind(wx.EVT_CLOSE, self.OnClose)
 
         # Set wx.WANTS_CHARS style for the keyboard to work.
@@ -187,6 +353,7 @@ class MainFrame(wx.Frame):
             self.Show()
 
     def setup_icon(self):
+        # TODO: we need an icon
         icon_file = os.path.join(os.path.abspath(os.path.dirname(__file__)),
                                  "resources", "wxpython.png")
         # wx.IconFromBitmap is not available on Linux in wxPython 3.0/4.0
@@ -194,13 +361,13 @@ class MainFrame(wx.Frame):
             icon = wx.IconFromBitmap(wx.Bitmap(icon_file, wx.BITMAP_TYPE_PNG))
             self.SetIcon(icon)
 
-    def create_menu(self):
-        filemenu = wx.Menu()
-        filemenu.Append(1, "Some option")
-        filemenu.Append(2, "Another option")
-        menubar = wx.MenuBar()
-        menubar.Append(filemenu, "&File")
-        self.SetMenuBar(menubar)
+    def _do_reset_geometry(self):
+        h.define_shape()
+        secs = list(h.allsec())
+        geo = []
+        for sec in secs:
+            geo += _segment_3d_pts(sec)
+        self.browser.ExecuteJavascript("set_neuron_section_data(%s);" % json.dumps(geo))
 
     def embed_browser(self):
         global browser_created_count, browser_weakvaldict
@@ -217,16 +384,23 @@ class MainFrame(wx.Frame):
         self.browser.SetClientHandler(FocusHandler())
         browser_weakvaldict[self.browser_id] = self # create mapping to frame object in weak value dict
 
-    def set_browser_callbacks(self):
-        self.bindings = cef.JavascriptBindings(bindToFrames=True, bindToPopups=True)
-        self.bindings.SetFunction("_print_to_terminal", _print_to_terminal)
-        self.bindings.SetFunction("_update_vars", _update_vars)
-        self.bindings.SetFunction("_py_function_handler", _py_function_handler)
-        self.bindings.SetFunction("_set_relevant_vars", _set_relevant_vars)
-        self.bindings.SetFunction("_flag_browser_ready", _flag_browser_ready)
+    def register_binding(self, name, f):
+        """Use this to setup a connection between javascript in the window and Python"""
+        self.bindings.SetFunction(name, f)
         self.browser.SetJavascriptBindings(self.bindings)
 
+    def set_browser_callbacks(self):
+        self.bindings = cef.JavascriptBindings(bindToFrames=True, bindToPopups=True)
+        self.register_binding("_print_to_terminal", _print_to_terminal)
+        self.register_binding("_update_vars", _update_vars)
+        self.register_binding("_py_function_handler", _py_function_handler)
+        self.register_binding("_set_relevant_vars", _set_relevant_vars)
+        self.register_binding("_flag_browser_ready", _flag_browser_ready)
+
     def OnSetFocus(self, _):
+        # TODO: can we be smarter about when we update shapeplot menus?
+        _update_shapeplot_menus()
+
         if not self.browser:
             return
         if WINDOWS:
@@ -259,7 +433,9 @@ class MainFrame(wx.Frame):
             self.Destroy()
             global g_count_windows
             g_count_windows -= 1
-            if g_count_windows == 0:
+            # disabling shutting down when browser frames (but not terminals) are all closed
+            # TODO: something better
+            if False and g_count_windows == 0:
                 cef.Shutdown()
                 wx.GetApp().ExitMainLoop()
                 # Call _exit otherwise app exits with code 255 (Issue #162).
@@ -296,6 +472,9 @@ class CefApp(wx.App):
         self.timer_id = 1
         self.is_initialized = False
         super(CefApp, self).__init__(redirect=redirect)
+        self.SetAppDisplayName('NEURON')
+        self.SetAppName('NEURON')
+
 
     def OnPreInit(self):
         super(CefApp, self).OnPreInit()
@@ -321,7 +500,7 @@ class CefApp(wx.App):
     def create_timer(self):
         # See also "Making a render loop":
         # http://wiki.wxwidgets.org/Making_a_render_loop
-        # Another way would be to use EVT_IDLE in MainFrame.
+        # Another way would be to use EVT_IDLE in NEURONWindow.
         self.timer = wx.Timer(self, self.timer_id)
         self.Bind(wx.EVT_TIMER, self.on_timer, self.timer)
         self.timer.Start(10)  # 10ms timer
@@ -333,26 +512,309 @@ class CefApp(wx.App):
         self.timer.Stop()
         return 0
 
+def make_voltage_axis_standalone():
+    html = """
+        <div class="lineplot" data-x-var="h.t" data-y-var="seg.v" data-xlab="time (ms)" data-legendlabs="voltage (mV)" style="width:100vw; height:100vh;"></div>
+    """
+    for sec in h.allsec():
+        break
+    else:
+        print('no sections defined')
+        current_shell.prompt()
+        return
+    return make_browser_html(html, user_mappings={'seg': h.cas()(0.5)}, title='Voltage axis', size=(300, 300))
+
+_shapeplot_menus = []
+
+# TODO: there is a decent amount of latency on recalculating a cell with "real" morphology; e.g. c91662
+#       rotates, etc, smoothly but toggling show-diam, etc
+def make_shapeplot_standalone(*args, **kwargs):
+    html = """
+        <div class="shapeplot" data-mode='1' style="width:100vw; height:100vh;"></div>
+    """
+    my_menu = wx.Menu()
+    show_diam_menuitem = my_menu.AppendCheckItem(_menu_id(), "Show Diam")
+    plotwhat_menu = wx.Menu()
+    plotwhat_menu.Append(_menu_id(), 'v')
+    my_menu.AppendSubMenu(plotwhat_menu, 'Plot What')
+    _shapeplot_menus.append(plotwhat_menu)
+    my_menu.AppendSeparator()
+    my_frame = make_browser_html(html, title='Shape plot', size=(300, 300), custom_menus={'ShapePlot': my_menu})
+    def toggle_show_diam(*args, **kwargs):
+        # TODO: this isn't a toggle... we should actually use the toggle menu item type
+        my_frame.browser.ExecuteJavascript("$('.shapeplot').attr('data-mode', 1 - $('.shapeplot').attr('data-mode')); for (var sp of _shape_plots) {sp.force_update()};")
+    my_frame.Bind(wx.EVT_MENU, toggle_show_diam, show_diam_menuitem)
+    _update_shapeplot_menus()
+    return my_frame
+
+def _update_shapeplot_menus(*args, **kwargs):
+    # TODO: should use checkboxes to show what (if anything) is currently plotted
+    #       this is part of why I didn't try to have a single plotwhat menu (since different selections)
+    #       no idea how that would have worked, anyway
+    # TODO: can we do this without destroying everything?
+    # TODO: if plotting different sections, should we treat the lists of allowed rangevars differently?
+    rangevars = rangevars_present(h.allsec())
+    for menu in _shapeplot_menus:
+        for item in menu.GetMenuItems():
+            menu.Delete(item)
+        for rangevar in rangevars:
+            menu.Append(_menu_id(), rangevar['name'])
+            # TODO: would need to somehow bind this to the frame or... something... 
+
+
+
+def show_run_button(*args):
+    html = '<button data-onclick="run()" style="width:100%; height:100vh; position: absolute; left:0; top:0">Init & Run</button>'
+    return make_browser_html(html,
+        user_mappings={'run': h.run},
+        title='Run Button',
+        size=(100, 50))
+
+def show_run_control(event):
+    return RunControl()
+
+
+class RunControl:
+    def __init__(self):
+        html = """
+        <table style="width:100%">
+            <tr><td><button data-onclick="init()">Init (mV)</button></td><td><input type="number" data-variable="v_init"></input></tr>
+            <tr><td><button data-onclick="run()">Init & run</button></td></tr>
+            <tr><td><button data-onclick="stopbutton()">Stop</button></td></tr>
+            <tr><td><button data-onclick="do_continue_until()">Continue until (ms)</button></td><td><input type="number" data-variable="continue_til"></input></tr>
+            <tr><td><button data-onclick="do_continue_for()">Continue for (ms)</button></td><td><input type="number" data-variable="continue_for"></input></tr>
+            <tr><td><button data-onclick="fadvance()">Single Step</button></td></tr>
+            <tr><td>t (ms)</td><td><input type="number" data-variable="t"></input></tr>
+            <tr><td>tstop (ms)</td><td><input type="number" data-variable="tstop"></input></tr>
+            <tr><td>dt (ms)</td><td><input type="number" data-variable="dt"></input></tr>
+            <tr><td>Real Time (s)</td><td><input type="number" data-variable="realtime" disabled></input></tr>
+        </table>
+        """
+        self.my_continue_til = h.ref(5)
+        self.my_continue_for = h.ref(1)
+        user_mappings = {
+            'v_init': h._ref_v_init,
+            'continue_til': self.my_continue_til,
+            'continue_for': self.my_continue_for,
+            't': h._ref_t,
+            'tstop': h._ref_tstop,
+            'dt': h._ref_dt,
+            'run': h.run,
+            'init': h.stdinit,
+            'fadvance': h.fadvance,
+            'realtime': h._ref_realtime,
+            'stopbutton': self.stop,
+            'do_continue_until': lambda: h.continuerun(self.my_continue_til[0]),
+            'do_continue_for': lambda: h.continuerun(h.t + self.my_continue_for[0])
+        }
+        self._frame = make_browser_html(html,
+            user_mappings=user_mappings,
+            title='Run Control',
+            size=(300, 280))
+    
+    def stop(self):
+        h.stoprun = True
+
+
+class RxDBuilder:
+    def __init__(self):
+        self._active_regions = []
+        self._active_species = []
+        self._active_reactions = []
+        with open(os.path.join(base_path, 'html', 'rxdbuilder.html')) as f:
+            html = f.read()
+        my_menu = wx.Menu()
+        m_save = my_menu.Append(_menu_id(), "Save model")
+        m_export_python = my_menu.Append(_menu_id(), "Export to Python")
+        m_instantiate = my_menu.Append(_menu_id(), 'Instantiate')
+        custom_menus = {'RxDBuilder': my_menu}
+        self._frame = make_browser_html(html, title='RxD Builder', custom_menus=custom_menus)
+        self._frame.register_binding("_update_data", self._update_data)
+        self._frame.Bind(wx.EVT_MENU, self.save_model, m_save)
+        self._frame.Bind(wx.EVT_MENU, self.save_model_as_python, m_export_python)
+        self._frame.Bind(wx.EVT_MENU, self.instantiate, m_instantiate)
+
+
+    def _update_data(self, var, value):
+        if var == 'active_regions':
+            self._active_regions = value
+        elif var == 'active_species':
+            self._active_species = value
+        elif var == 'active_reactions':
+            self._active_reactions = value
+        else:
+            print('unknown data type:', var)
+            current_shell.prompt()
+
+    def save_model(self, event):
+        with wx.FileDialog(self._frame, "Save RxDBuilder as JSON", wildcard="JSON files (*.json)|*.json",
+                           style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT) as fileDialog:
+
+            if fileDialog.ShowModal() == wx.ID_CANCEL:
+                return
+
+            pathname = fileDialog.GetPath()
+            try:
+                with open(pathname, 'w') as f:
+                    f.write(json.dumps({
+                            'regions': self._active_regions,
+                            'species': self._active_species,
+                            'reactions': self._active_reactions
+                        }, indent=4))
+            except IOError:
+                print('Save failed.')
+                current_shell.prompt()
+            except:
+                print('Mysterious save failure.')
+                current_shell.prompt()
+
+    def save_model_as_python(self, event):
+        with wx.FileDialog(self._frame, "Save RxDBuilder as Python", wildcard="Python files (*.py)|*.py",
+                           style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT) as fileDialog:
+
+            if fileDialog.ShowModal() == wx.ID_CANCEL:
+                return
+
+            pathname = fileDialog.GetPath()
+            try:
+                with open(pathname, 'w') as f:
+                    f.write(model_to_python(self._active_regions, self._active_species, self._active_reactions))
+            except IOError:
+                print('Save failed.')
+                current_shell.prompt()
+            except:
+                print('Mysterious save failure.')
+                current_shell.prompt()
+
+    def instantiate(self, event):
+        my_code = model_to_python(self._active_regions, self._active_species, self._active_reactions)
+        print('Running:\n' + my_code)
+        current_shell.prompt()
+        exec(my_code, shared_locals)
+
+def show_rxd_builder(event):
+    return RxDBuilder()
+
+def model_to_python(regions, species, reactions):
+    result = '''from neuron import rxd
+from neuron import h
+'''
+
+    active_regions = set()
+    for sp in species:
+        for r in sp['regions']:
+            active_regions.add(r['uuid'])
+
+    region_uuid_lookup = {r['uuid']: r['name'] for r in regions}
+    species_uuid_lookup = {r['uuid']: r['name'] for r in species}
+
+
+    for r in regions:
+        if r['uuid'] in active_regions:
+            if r['type'] == 'cyt':
+                result += '{name} = rxd.Region(h.allsec(), nrn_region="i", name="{name}", geometry=rxd.FractionalVolume(volume_fraction={volumefraction}, neighbor_areas_fraction={volumefraction}, surface_fraction=1))\n'.format(**r)
+            elif r['type'] == 'extracellular':
+                result += '{name} = rxd.Extracellular(xlo=-500, ylo=-500, xhi=500, yhi=500, zlo=-500, zhi=500, dx={dx}, name="{name}", volume_fraction={volumefraction}, tortuosity={tortuosity})\n'.format(**r)
+            else:
+                result += '{name} = rxd.Region(h.allsec(), name="{name}", geometry=rxd.FractionalVolume(volume_fraction={volumefraction}, neighbor_areas_fraction={volumefraction}, surface_fraction=0))\n'.format(**r)
+
+    for sp in species:
+        if sp['regions']:
+            if len(sp['regions']) > 1:
+                print('warning: currently ignoring non-uniform d, initial and just using the first value')
+            d = sp['regions'][0]['d']
+            initial = sp['regions'][0]['initial']
+            sp_copy = dict(sp)
+            sp_copy['my_regions'] = '[' + ','.join(region_uuid_lookup[r['uuid']] for r in sp['regions']) + ']'
+            sp_copy['d'] = d
+            sp_copy['initial'] = initial
+            result += '{name} = rxd.Species({my_regions}, charge={charge}, name="{name}", d={d}, initial={initial})\n'.format(**sp_copy)
+            for r in sp['regions']:
+                if r['rate']:
+                    data = {
+                        'my_region':region_uuid_lookup[r['uuid']],
+                        'name': sp['name'],
+                        'rate': r['rate']
+                    }
+                    result += '{name}_{my_region}_rate = rxd.Rate({name}[{my_region}], {rate})\n'.format(**data)
+
+    for r in reactions:
+        r['custom_dynamics'] = not(r['mass_action'])
+        if r['states']:
+            print('Warning: reaction states currently ignored')
+        if r['all_regions']:
+            reactants = '+'.join('{}*{}'.format(s['stoichiometry'], species_uuid_lookup[s['uuid']]) for s in r['sources'])
+            products = '+'.join('{}*{}'.format(s['stoichiometry'], species_uuid_lookup[s['uuid']]) for s in r['dests'])
+            data = {
+                'custom_dynamics': not(r['mass_action']),
+                'reactants': reactants,
+                'products': products,
+                'name': r['name'],
+                'kf': r['kf'],
+                'kb': r['kb']
+            }
+            result += '{name} = rxd.Reaction({reactants}, {products}, {kf}, {kb}, custom_dynamics={custom_dynamics})\n'.format(**data)
+        else:
+            # check to see if multi-compartment or regular
+            involved_regions = set()
+            for s in r['sources']:
+                involved_regions.add(s['region'])
+            for s in r['dests']:
+                involved_regions.add(s['region'])
+            if len(involved_regions) > 1:
+                # multicompartment reaction
+                print('warning: multicompartment reactions currently unsupported')
+            else:
+                # single specific compartment reaction
+                reactants = '+'.join('{}*{}'.format(s['stoichiometry'], species_uuid_lookup[s['uuid']]) for s in r['sources'])
+                products = '+'.join('{}*{}'.format(s['stoichiometry'], species_uuid_lookup[s['uuid']]) for s in r['dests'])
+                data = {
+                    'custom_dynamics': not(r['mass_action']),
+                    'reactants': reactants,
+                    'products': products,
+                    'name': r['name'],
+                    'kf': r['kf'],
+                    'kb': r['kb'],
+                    'region': region_uuid_lookup[s['region']]
+                }
+                result += '{name} = rxd.Reaction({reactants}, {products}, {kf}, {kb}, custom_dynamics={custom_dynamics}, regions=[{region}])\n'.format(**data)
+
+    return result
+
 
 _all_windows = []
+current_shell = None
 
-# TODO: incorporate g_count_windows logic
-def make_terminal():
-    window = wx.Frame(None, title="Console [{}]".format(len(_all_windows) + 1), size=(600, 400))
+def make_terminal(*args, **kwargs):
+    global current_shell
+    window = NEURONFrame(None, title="Console [{}]".format(len(_all_windows) + 1), size=(600, 400))
     # by explicitly specifying the locals, we couple the shells together
     # while simultaneously keeping them unable to directly access our code
     # hmm... maybe a bad idea; should we transfer over a gui variable?
     shell = wx.py.shell.Shell(parent=window, locals=shared_locals)
+    window.create_menu()
     _all_windows.append(shell)
     shared_locals['shell'] = shell
-    shell.run("print('Type make_terminal() or make_browser() or quit()')", verbose=False, prompt=False)
-    #shell.write("Type make_terminal() or make_browser() or quit()\n")
+    current_shell = shell
+    current_shell.redirectStdout(True)
+    current_shell.redirectStdin(True)
+    current_shell.redirectStderr(True)
+    shell.write("\nType setupSim() or quit() or use the menus or use NEURON as usual\n")
+    shell.prompt()
     window.Show(True) 
 
-def make_browser(html_file, user_mappings):
+def make_browser_html(html, user_mappings={}, title='', size=(600, 400), custom_menus={}):
     global browser_created_count
     browser_created_count += 1
-    frame = MainFrame(html_file, user_mappings)
+    frame = NEURONWindow(user_mappings=user_mappings, html=html, title=title, size=size, custom_menus=custom_menus)
+    frame.Show()
+    _all_windows.append(frame)
+    return frame
+
+def make_browser(html_file, user_mappings={}):
+    global browser_created_count
+    browser_created_count += 1
+    frame = NEURONWindow(html_file, user_mappings)
     frame.Show()
     _all_windows.append(frame)
     return frame
@@ -389,6 +851,7 @@ def monitor_browser_vars(this_browser):
 def _print_to_terminal():
     # experimental info relayed to terminal from browser action
     print("So this worked.")
+    current_shell.prompt()
 
 def _py_function_handler(browser_id, function_string):
     global browser_weakvaldict 
@@ -400,17 +863,26 @@ def _flag_browser_ready(browser_id):
     browser_weakvaldict[browser_id].ready_status = 1
 
 def lookup(this_browser, variable, action, newValue=None):
-    mappings =  this_browser.user_mappings
+    mappings = this_browser.user_mappings
     # repeated process to check for a variable in a particular browser's mappings and then shared_locals
     # action can be "get" or "set"; newValue is value to set
     split = variable.split('.')
     if len(split) == 1:
         # single variable
+        # TODO: just because something is a HocObject doesn't mean it's a pointer
+        # TODO: would it be faster to separate ptrs from not pointers in advance?
+        #       (maybe, maybe not)
         if variable in mappings.keys():
             if action == "get":
-                return mappings.get(variable)
-            elif action =="set":
-                mappings[variable] = newValue
+                result = mappings.get(variable)
+                if isinstance(result, HocObject):
+                    return result[0]
+                return result
+            elif action == "set":
+                if isinstance(mappings[variable], HocObject):
+                    mappings[variable][0] = newValue
+                else:
+                    mappings[variable] = newValue
         elif variable in shared_locals.keys():
             if action == "get":
                 return shared_locals.get(variable)
@@ -418,6 +890,7 @@ def lookup(this_browser, variable, action, newValue=None):
                 shared_locals[variable] = newValue
         else:
             print("unknown variable: ", variable)
+            current_shell.prompt()
             return None
     else:
         # if it's an attribute of an object
@@ -434,6 +907,7 @@ def lookup(this_browser, variable, action, newValue=None):
                 setattr(shared_locals[obj], attribute, newValue)
         else:
             print("unknown variable: ", variable)
+            current_shell.prompt()
             return None
 
 def lookup_graph_var(this_browser, variable):
@@ -447,6 +921,7 @@ def lookup_graph_var(this_browser, variable):
         return getattr(shared_locals[obj], "_ref_"+attribute)
     else:
         print("unknown variable: ", variable)
+        current_shell.prompt()
         return None
 
 def _update_vars(browser_id, variable, value):
@@ -510,11 +985,25 @@ def send_graph_vars(this_browser, action):
             to_send[k] = list(graph_vars[k])[this_browser.t_tracker:]  # only the new data
     this_browser.browser.ExecuteJavascript("update_graph_vectors({}, {})".format(json.dumps(to_send), json.dumps([action])))
 
-def _update_browser_vars(this_browser, locals_copy):  
+def _update_browser_vars(this_browser, locals_copy):
+    # check for changes to the morphology
+    old_diam_changed = h.diam_changed
+    h.define_shape()
+    if old_diam_changed or h.diam_changed or _diam_change_count.value != this_browser._last_diam_change_count or _structure_change_count.value != this_browser._last_structure_change_count:
+        h.doNotify()
+        this_browser._last_diam_change_count = _diam_change_count.value
+        this_browser._last_structure_change_count = _structure_change_count.value
+        #print('structure changed')
+        # TODO: monitor for the presence of a shape plot... only do this when there actually is one
+        this_browser._do_reset_geometry()
+        # TODO: do this only for this browser's menu; this will eliminate the need for the for loop in _update_shapeplot_menus
+        _update_shapeplot_menus()
+
+
     # create dictionary of the changed variables 
     changed_vars, deleted_vars = find_changed_vars(this_browser, locals_copy)
     locals_copy.update(changed_vars)
-    # handle deletions separately 
+    # handle deletions separately
     for d in deleted_vars:
         del locals_copy[d]
     # update the changed variables for javascript
@@ -539,8 +1028,12 @@ def _update_browser_vars(this_browser, locals_copy):
 def setupSim():
     shared_locals['shell'].runfile('setup.txt')
 
-shared_locals = {'make_terminal': make_terminal, 'make_browser': make_browser, 'quit': sys.exit, 'delete_var':delete_var,
+shared_locals = {'make_browser': make_browser, 'quit': sys.exit, 'delete_var':delete_var,
 'weakdict':browser_weakvaldict, 'sim': lambda: make_browser("simulation1.html"), 'setupSim':setupSim}
+
+# todo: should this be here or in main
+import gui
+gui.make_browser_html = make_browser_html
 
 if __name__ == '__main__':
     main()
