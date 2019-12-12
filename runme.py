@@ -516,13 +516,15 @@ def make_voltage_axis_standalone():
     html = """
         <div class="lineplot" data-x-var="h.t" data-y-var="seg.v" data-xlab="time (ms)" data-legendlabs="voltage (mV)" style="width:100vw; height:100vh;"></div>
     """
+    this_sec = None
     for sec in h.allsec():
+        this_sec = sec
         break
     else:
         print('no sections defined')
         current_shell.prompt()
         return
-    return make_browser_html(html, user_mappings={'seg': h.cas()(0.5)}, title='Voltage axis', size=(300, 300))
+    return make_browser_html(html, user_mappings={'seg': this_sec(0.5)}, title='Voltage axis', size=(300, 300))
 
 _shapeplot_menus = []
 
@@ -953,6 +955,8 @@ def _set_relevant_vars(to_update):
             this_browser.t_tracker_vec = graph_vars[0]
 
     this_browser.monitor_loop = monitor_browser_vars(this_browser)
+    # initiate graphs with axes
+    this_browser.browser.ExecuteJavascript("update_graph_vectors([], {})".format(json.dumps(["initiate"])))
     
 
 def delete_var(v):
@@ -998,7 +1002,6 @@ def _update_browser_vars(this_browser, locals_copy):
         this_browser._do_reset_geometry()
         # TODO: do this only for this browser's menu; this will eliminate the need for the for loop in _update_shapeplot_menus
         _update_shapeplot_menus()
-
 
     # create dictionary of the changed variables 
     changed_vars, deleted_vars = find_changed_vars(this_browser, locals_copy)
