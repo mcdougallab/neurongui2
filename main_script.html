@@ -116,12 +116,18 @@ function update_graph_vectors(graph_vars, action) {
         if (!id) {
             $(this).attr('id', `graph_${graph_count}`);
         }
+
         var x_var = $(this).attr('data-x-var');
-        console.log(graph_vars[x_var].length);
+        var y_vars = $(this).attr('data-y-var').split(';');
 
-        if (graph_vars[x_var].length > 0) {
+        // initiate empty graph placeholder
+        if (action =="initiate") {
+            make_lineplot([], this, [0, 5, -70, 0])
+        }
 
-            var y_vars = $(this).attr('data-y-var').split(';');
+        else if (graph_vars[x_var].length > 0) {
+            console.log(graph_vars[x_var].length);
+
             var x_val = graph_vars[x_var]
             var lineplot_data = {}; 
             var ymins = [];
