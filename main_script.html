@@ -18,6 +18,7 @@ HTML_GOES_HERE
 var to_update = [];
 var graph_vars = [];
 var browser_id = BROWSER_ID_GOES_HERE;
+var graph_count = 0;
 
 // min and max functions so large arrays don't crash
 function arrayMin(arr) {
@@ -109,7 +110,12 @@ function update_graph_vectors(graph_vars, action) {
     console.log('action', action);
     my_gv = graph_vars;
     d3.selectAll("div[class='lineplot']").each( function () {
+        graph_count++;
         var id = $(this).attr('id');
+        // make sure they have individual identifiers
+        if (!id) {
+            $(this).attr('id', `graph_${graph_count}`);
+        }
         var x_var = $(this).attr('data-x-var');
         console.log(graph_vars[x_var].length);
 
@@ -220,6 +226,7 @@ function make_lineplot(dat, object, dims) {
     var colorpick = ["steelblue", "red", "yellow", "green"];
     var div = d3.select(object);
     var div_jquery = $(object);
+    var div_id = div.attr("id");
      
     var xlabel = $(object).attr("data-xlab");
     var ylabel = $(object).attr("data-ylab");
@@ -243,18 +250,17 @@ function make_lineplot(dat, object, dims) {
     .domain([dims[2]-padding, dims[3]+padding])
     .range([h-margin, margin/2]);
 
-    svg.append("g")
+    var axis_x = d3.axisBottom().scale(xscale).ticks(6);
+    var axis_y = d3.axisLeft().scale(yscale).ticks(10);
+
+    yaxis_group = svg.append("g")
         .attr("class", "yaxis")
         .attr("transform", `translate(${margin+10},0)`)
-        .call(d3.axisLeft()
-            .scale(yscale)
-            .ticks(10));
-    svg.append("g")
+        .call(axis_y);
+    xaxis_group = svg.append("g")
         .attr("class", "xaxis")
         .attr("transform", `translate(0,${h-margin})`)
-        .call(d3.axisBottom()
-            .scale(xscale)
-            .ticks(6));
+        .call(axis_x);
     svg.append("text")
         .attr("x", xscale(dims[1]-0.5*(dims[1]-dims[0])))
         .attr("y", h-margin*0.3)
@@ -289,22 +295,53 @@ function make_lineplot(dat, object, dims) {
         })
     }
 
+    // Add a clipPath: everything out of this area won't be drawn - for zooming
+    var clip = svg.append("defs").append("svg:clipPath")
+        .attr("id", `clip_${div_id}`)
+        .append("svg:rect")
+        .attr("width", w-margin*3/2)
+        .attr("height", h-margin*3/2)
+        .attr("x", margin+10)
+        .attr("y", margin/2);
+    var linewrap = svg.append('g')
+        .attr("class", "linewrap")
+        .attr("clip-path", `url(#clip_${div_id})`);
+
+
     var index = 0;
     $.each(dat, function(series_name, series_dat) {  // go through each series
         var series_color = colorpick[index];
-        svg.append("path")
+        linewrap.append("path")
             .datum(series_dat)
             .attr("id", series_name.replace('.','_'))
             .attr("class", "line")
             .attr("fill", "none")
             .attr("stroke", series_color)
             .attr("stroke-width", 2)
+            .attr('vector-effect', "non-scaling-stroke")
             .attr("d", d3.line()
                 .x(function(d) {return xscale(d[0]);})
                 .y(function(d) {return yscale(d[1]);}));
 
         index++;
     });
+
+    // add pan/zoom functionality
+    svg.call(d3.zoom()
+            .extent([[0, 0], [w, h]])
+            .scaleExtent([1, 8])
+            .translateExtent([[-padding, -padding], [w+padding, h+padding]])
+            .on("zoom", zoomed));
+    
+    function zoomed() {
+        svg.select(".linewrap").selectAll(".line")
+            .attr("transform", d3.event.transform)
+
+        var new_xscale = d3.event.transform.rescaleX(xscale);
+        var new_yscale = d3.event.transform.rescaleY(yscale);
+        svg.select(".xaxis").call(axis_x.scale(new_xscale));
+        svg.select(".yaxis").call(axis_y.scale(new_yscale));
+    }
 };
 
 //function update_lineplot(new_dat, object, new_dims) {
@@ -319,7 +356,7 @@ function update_lineplot(object, x_var, y_vars, graph_vars) {
     var svg = d3.select(object).select('svg');
 
     $.each(y_vars, function (ind, y) {
-        var p_data = svg.select(`#${y.replace('.','_')}`).datum();//[0];
+        var p_data = svg.select(".linewrap").select(`#${y.replace('.','_')}`).datum();
         var y_val = graph_vars[y]
         ymins.push(arrayMin(p_data.map((k, i) => k[1])));    // will this mapping work?
         ymins.push(arrayMin(y_val)); // need to compare both
@@ -363,30 +400,44 @@ function update_lineplot(object, x_var, y_vars, graph_vars) {
             .domain([new_dims[2]-padding, new_dims[3]+padding])
             .range([h-margin, margin/2]);
 
+        var axis_x = d3.axisBottom().scale(xscale).ticks(6);
+        var axis_y = d3.axisLeft().scale(yscale).ticks(10);
+
         svg.select(".yaxis")
             .transition()
-            .call(d3.axisLeft()
-                .scale(yscale)
-                .ticks(10));
+            .call(axis_y);
         svg.select(".xaxis")
             .transition()
-            .call(d3.axisBottom()
-                .scale(xscale)
-                .ticks(6));
+            .call(axis_x);
 
         var index = 0;
         $.each(new_dat, function(series_name, series_dat) {  // go through each series
             var series_color = colorpick[index];
-            svg.select(`#${series_name.replace('.','_')}`)
+            svg.select(".linewrap").select(`#${series_name.replace('.','_')}`)
                 .data([series_dat])
                 .attr("d", d3.line()
                     .x(function(d) {return xscale(d[0]);})
                     .y(function(d) {return yscale(d[1]);}));
 
-            //TODO: add legend 
-
             index++;
         });
+
+        // redo pan/zoom functionality
+        svg.call(d3.zoom()
+                .extent([[0, 0], [w, h]])
+                .scaleExtent([1, 8])
+                .translateExtent([[-padding, -padding], [w+padding, h+padding]])
+                .on("zoom", zoomed));
+
+        function zoomed() {
+            svg.select(".linewrap").selectAll(".line")
+                .attr("transform", d3.event.transform)
+
+            var new_xscale = d3.event.transform.rescaleX(xscale);
+            var new_yscale = d3.event.transform.rescaleY(yscale);
+            svg.select(".xaxis").call(axis_x.scale(new_xscale));
+            svg.select(".yaxis").call(axis_y.scale(new_yscale));
+        }
     }
 
 }
