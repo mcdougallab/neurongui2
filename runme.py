@@ -850,11 +850,6 @@ def monitor_browser_vars(this_browser):
     timer.start()
     return timer
 
-def _print_to_terminal():
-    # experimental info relayed to terminal from browser action
-    print("So this worked.")
-    current_shell.prompt()
-
 def _py_function_handler(browser_id, function_string):
     global browser_weakvaldict 
     # first check user mappings then shared_locals for the function
@@ -997,7 +992,6 @@ def _update_browser_vars(this_browser, locals_copy):
         h.doNotify()
         this_browser._last_diam_change_count = _diam_change_count.value
         this_browser._last_structure_change_count = _structure_change_count.value
-        #print('structure changed')
         # TODO: monitor for the presence of a shape plot... only do this when there actually is one
         this_browser._do_reset_geometry()
         # TODO: do this only for this browser's menu; this will eliminate the need for the for loop in _update_shapeplot_menus
@@ -1031,8 +1025,7 @@ def _update_browser_vars(this_browser, locals_copy):
 def setupSim():
     shared_locals['shell'].runfile('simulation_setup.py')
 
-shared_locals = {'make_browser': make_browser, 'quit': sys.exit, 'delete_var':delete_var,
-'weakdict':browser_weakvaldict, 'sim': lambda: make_browser("simulation1.html"), 'setupSim':setupSim}
+shared_locals = {'make_browser': make_browser, 'quit': sys.exit, 'weakdict':browser_weakvaldict, 'setupSim':setupSim}
 
 # todo: should this be here or in main
 import gui
