@@ -66,9 +66,6 @@ function update_html_variable_displays(changed, deleted) {
     $.each(changed, function(key, value) {
         $(`span[data-variable="${key}"]`).text(value);
         $(`input[data-variable="${key}"]`).val(value);
-        $(`div[data-variable="${key}"][class='barplot']`).each( function() {
-            make_barplot(value, this);    // send in this
-        });
     });
     $.each(deleted, function(index, key) {
         // deleted variables. individual handling maybe?
@@ -279,48 +276,7 @@ $('input').focusout(function() {   // also update if focus is lost on input
 $('input:checkbox').change(function() {   // also update if focus is lost on input
     _update_vars(browser_id, $(this).attr('data-variable'), $(this).is(':checked'))
 });
-function make_barplot(dat, object) {
 
-    var div = d3.select(object);
-    var div_jquery = $(object);
-    // clear a previous plot
-    div.select("svg").remove();
-
-    var w = div_jquery.width();
-    var h = div_jquery.height();
-    var svg = div.append("svg").attr("width", w).attr("height", h);
-
-    var xscale = d3.scaleLinear()
-        .domain([0, dat.length])
-        .range([0, w-(w/dat.length-5)]);
-
-    var yscale = d3.scaleLinear()
-        .domain([d3.min(dat)-1, d3.max(dat)])
-        .range([h, 0]);
-
-    var colorscale = d3.scaleLinear()
-        .domain([d3.min(dat), d3.max(dat)])
-        .range([0, 255]);
-
-    svg.selectAll("rect")
-        .data(dat)
-        .enter()
-        .append("rect")
-        .attr("x", function(d, i) {
-            return xscale(i);
-        })
-        .attr("y", function(d) {
-            return yscale(d);
-        })
-        .attr("width", w/dat.length - 5)
-        .attr("height", function(d) {
-            return h-yscale(d);
-        })
-        .attr("fill", function(d) {
-            return `rgb(0, 0, ${colorscale(d)})`;
-        })
-
-};
 
 function make_lineplot(dat, object) {
     console.log("making lineplot");
