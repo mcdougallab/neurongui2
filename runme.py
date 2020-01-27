@@ -514,7 +514,7 @@ class CefApp(wx.App):
 
 def make_voltage_axis_standalone():
     html = """
-        <div class="lineplot" data-x-var="h.t" data-y-var="seg.v" data-xlab="time (ms)" data-legendlabs="voltage (mV)" style="width:100vw; height:100vh;"></div>
+        <div class="lineplot" data-x-var="h.t" data-y-var="seg.v" data-xlab="time (ms)" data-legendlabs="voltage (mV)" style="width:90vw; height:90vh;"></div>
     """
     this_sec = None
     for sec in h.allsec():
