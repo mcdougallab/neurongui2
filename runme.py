@@ -1029,7 +1029,7 @@ def _update_browser_vars(this_browser, locals_copy):
                 this_browser.t_tracker = current_lengthT
 
 def setupSim():
-    shared_locals['shell'].runfile('setup.txt')
+    shared_locals['shell'].runfile('simulation_setup.py')
 
 shared_locals = {'make_browser': make_browser, 'quit': sys.exit, 'delete_var':delete_var,
 'weakdict':browser_weakvaldict, 'sim': lambda: make_browser("simulation1.html"), 'setupSim':setupSim}
