@@ -196,6 +196,10 @@ function update_graph_vectors(graph_vars, action) {
         var x_var = $(this).attr('data-x-var');
         var y_vars = $(this).attr('data-y-var').split(';');
 
+        if (y_vars.length() > 5) { // warning for exceeding max #lines.  TODO: come back to this
+            console.log("WARNING: more than 5 series not supported on one plot.");
+        }
+
         // initiate empty graph placeholder
         var default_xlim = [0, 5];
         var default_ylim = [-70, 0];
@@ -368,9 +372,6 @@ function make_lineplot(dat, object) {
 
 
     var index = 0;
-    if (dat.length() > 5) { // warning for exceeding max lines.  TODO: formalize/check
-        console.log("WARNING: more than 5 series not supported on one plot.");
-    }
     $.each(dat, function(series_name, series_dat) {  // go through each series
         var series_color = colorpick[index];
         linewrap.append("path")
