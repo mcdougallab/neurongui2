@@ -23,7 +23,11 @@ import neuron
 import ctypes
 
 HocObject = hoc.HocObject
-base_path = os.path.split(__file__)[0]
+try:
+    base_path = os.path.split(__file__)[0]
+except:
+    # TODO: remove this. bad
+    base_path = 'c:\\Users\\Lia\\Desktop\\neurongui_wrapper'
 
 _structure_change_count = neuron.nrn_dll_sym('structure_change_cnt', ctypes.c_int)
 _diam_change_count = neuron.nrn_dll_sym('diam_change_cnt', ctypes.c_int)
@@ -353,6 +357,8 @@ class NEURONWindow(NEURONFrame):
             self.Show()
 
     def setup_icon(self):
+        # TODO: remove this if we have a real icon
+        return
         # TODO: we need an icon
         icon_file = os.path.join(os.path.abspath(os.path.dirname(__file__)),
                                  "resources", "wxpython.png")
@@ -391,7 +397,6 @@ class NEURONWindow(NEURONFrame):
 
     def set_browser_callbacks(self):
         self.bindings = cef.JavascriptBindings(bindToFrames=True, bindToPopups=True)
-        self.register_binding("_print_to_terminal", _print_to_terminal)
         self.register_binding("_update_vars", _update_vars)
         self.register_binding("_py_function_handler", _py_function_handler)
         self.register_binding("_set_relevant_vars", _set_relevant_vars)
