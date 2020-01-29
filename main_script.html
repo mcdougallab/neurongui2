@@ -112,9 +112,11 @@ function resize_graphs() {
         d3.select(this).select("svg").attr("width", w).attr("height", h); // udpate svg dimensions
         svg = d3.select(this).select("svg");
 
+        svg.select(".zoom").call(zoom.transform, d3.zoomIdentity);
+
         // dealing with user-set bounds
         if (div.attr("data-xlim")) {var x_dims = div.attr("data-xlim").split(';');} else {var x_dims = div.data("x_dimensions");}
-        if (div.attr("data-ylim")) {var x_dims = div.attr("data-ylim").split(';');} else {var y_dims = div.data("y_dimensions");}
+        if (div.attr("data-ylim")) {var y_dims = div.attr("data-ylim").split(';');} else {var y_dims = div.data("y_dimensions");}
 
         // update everything else
         var colorpick = ["steelblue", "red", "yellow", "green", "cyan"];
@@ -124,7 +126,6 @@ function resize_graphs() {
         var xscale = d3.scaleLinear()
             .domain([x_dims[0], x_dims[1]])
             .range([margin+10, w+10-margin/2]);
-
         var yscale = d3.scaleLinear()
             .domain([y_dims[0], y_dims[1]])
             .range([h-margin, margin/2]);
@@ -147,6 +148,12 @@ function resize_graphs() {
         svg.select(".ylabel")
             .attr("y", yscale(y_dims[1] - 0.5*(y_dims[1]-y_dims[0])))
             .attr("transform", `rotate(-90,${margin*0.3},${yscale(y_dims[1]-0.5*(y_dims[1]-y_dims[0]))})`);
+
+        svg.select("defs").select(`#clip_${div_id}`).select("rect")
+            .attr("width", w-margin*3/2)
+            .attr("height", h-margin*3/2);
+        svg.select(".linewrap")
+            .attr("clip-path", `url(#clip_${div_id})`);
 
         var index = 0;
         $.each(y_vars, function (ind, y) {
@@ -196,7 +203,7 @@ function update_graph_vectors(graph_vars, action) {
         var x_var = $(this).attr('data-x-var');
         var y_vars = $(this).attr('data-y-var').split(';');
 
-        if (y_vars.length() > 5) { // warning for exceeding max #lines.  TODO: come back to this
+        if (y_vars.length > 5) { // warning for exceeding max #lines.  TODO: come back to this
             console.log("WARNING: more than 5 series not supported on one plot.");
         }
 
@@ -240,8 +247,8 @@ function update_graph_vectors(graph_vars, action) {
                     console.log("no y data bounds given, auto dimensions set");
                     var ydims =  [arrayMin(ymins), arrayMax(ymaxs)];
                     var padding = Math.floor((ydims[0]-ydims[1])/10);
-                    ydims[0] = ydims[0] - padding;
-                    ydims[1] = ydims[1] + padding;
+                    ydims[0] = ydims[0] + padding;
+                    ydims[1] = ydims[1] - padding;
                     $(this).data("y_dimensions", ydims);
                 }
                 make_lineplot(lineplot_data, this);
@@ -345,13 +352,13 @@ function make_lineplot(dat, object) {
         var nleg = legend_labs.length;
         $.each(legend_labs, function(ind, lab) {
             svg.append("rect")
-                .attr("x", (ind+1)*(w/(nleg+1)))
+                .attr("x", (ind+1)*60)
                 .attr("y", margin/4-8)
                 .attr("width", 10)
                 .attr("height", 10)
                 .attr("fill", colorpick[ind])
             svg.append("text")
-                .attr("x", (ind+1)*(w/(nleg+1)) + 13)
+                .attr("x", (ind+1)*60 + 13)
                 .attr("y", margin/4)
                 .text(lab)
                 .attr("font-size", "12px");
@@ -449,8 +456,8 @@ function update_lineplot(object, x_var, y_vars, graph_vars) {
         if (!$(object).attr("data-ylim")) {
             var ydims = [arrayMin(ymins), arrayMax(ymaxs)];
             var padding = Math.floor((ydims[1]-ydims[0])/10);
-            ydims[0] = ydims[0] - padding;   
-            dims[1] = ydims[1] + padding;
+            ydims[0] = ydims[0] + padding;   
+            dims[1] = ydims[1] - padding;
             $(object).data("y_dimensions", ydims); 
             var new_ydims = ydims;
         }
