@@ -305,7 +305,10 @@ class NEURONWindow(NEURONFrame):
         with open(os.path.join(base_path, 'js', 'setup_threejs.js')) as f:
             three_js_stuff = f.read()
 
-        self.wrapper_html = my_wrapper_html.replace("HTML_GOES_HERE", my_html)
+        with open(os.path.join(base_path, 'auto_style.css')) as f:
+            stylesheet = f.read()
+
+        self.wrapper_html = my_wrapper_html.replace("HTML_GOES_HERE", my_html).replace('/*STYLESHEET_HERE*/', stylesheet)
         self.wrapper_html = self.wrapper_html.replace('DECLARE_THREE_JS_HERE', three_js_stuff).replace('DECLARE_PLOTSHAPE_CODE', plotshape_js)
 
         # Must ignore X11 errors like 'BadWindow' and others by
@@ -915,16 +918,26 @@ def lookup(this_browser, variable, action, newValue=None):
 def lookup_graph_var(this_browser, variable):
     # specifically for graph vector variables; only to retrieve
     # _ref_ attributes
+    # handles layered attributes if first key is available to retrieve
     mappings = this_browser.user_mappings
-    obj, attribute = variable.split('.')
-    if obj in mappings.keys():
-        return getattr(mappings[obj], "_ref_"+attribute)
-    elif obj in shared_locals.keys():
-        return getattr(shared_locals[obj], "_ref_"+attribute)
+    split_var = variable.split('.')
+    key = split_var[0]
+    attributes = split_var[1:]
+    if key in mappings.keys():
+        obj = mappings[key]
+    elif key in shared_locals.keys():
+        obj = shared_locals[key]
     else:
         print("unknown variable: ", variable)
         current_shell.prompt()
         return None
+
+    i_attr = 0
+    len_attr = len(attributes)
+    while i_attr < (len_attr - 1):
+        obj = getattr(obj, attributes[i_attr])
+        i_attr += 1
+    return getattr(obj, "_ref_"+attributes[i_attr])
 
 def _update_vars(browser_id, variable, value):
     global browser_weakvaldict

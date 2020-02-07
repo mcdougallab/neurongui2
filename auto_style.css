@@ -1,0 +1,44 @@
+body {
+    background-color: #f2f3f4;
+}
+#inp_fields {
+    margin: 50px;
+    float: left;
+    overflow: hidden;
+    position: relative;
+    padding: 10px;
+}
+div.lineplot {
+    margin-top: 50px;
+    width: 400px;
+    height: 400px;
+    border: 2px solid black;
+    padding: 8px;
+    background-color: white;
+}
+div.inputs {
+    display: grid;
+    grid-template-columns: max-content max-content max-content;
+    grid-gap: 5px;
+}
+div.buttons { 
+    margin-top: 40px;
+}
+div.flex-container-h {
+    display: flex;
+    justify-content: space-evenly;
+}
+div.flex-container-v {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-evenly;
+}
+button {
+    display: block;
+    height: 40px;
+    text-align: center;
+    width: 50%;
+    float: left;
+    color: white;
+    background-color: #341575;
+}

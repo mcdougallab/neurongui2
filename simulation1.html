@@ -1,5 +1,5 @@
 
-<style>
+<!--<style>
     body {
         background-color: #f2f3f4;
     }
@@ -35,7 +35,7 @@
         color: white;
         background-color: #341575;
     }
-</style>
+</style>-->
 
 <div id="inp_fields">
 
@@ -68,8 +68,8 @@
 </div>
 
 <div class="lineplot" data-x-var="h.t" data-y-var="seg.v" data-xlab="time (ms)" data-legendlabs="voltage (mV)" style="margin-top:50px; width:30vw; height:30vh; float:left"></div>
-<div class="lineplot"  data-x-var="h.t" data-y-var="seg.m_hh;seg.n_hh;seg.h_hh" data-xlab="time (ms)" data-legendlabs="m;n;h" data-xlim="-1;1"  style="margin-top:50px; width:300px; height:300px; float:right"></div>
-<div class="lineplot"  data-x-var="seg.m_hh" data-y-var="seg.n_hh" data-xlab="m" data-ylab="n" style="margin-top:50px; width:300px; height:300px; float:left"></div>
+<div class="lineplot"  data-x-var="h.t" data-y-var="seg.hh.m;seg.hh.n;seg.hh.h" data-xlab="time (ms)" data-legendlabs="m;n;h" data-xlim="-1;1" data-ylim="-1;1" style="margin-top:50px; width:300px; height:300px; float:right"></div>
+<div class="lineplot"  data-x-var="seg.hh.m" data-y-var="seg.hh.n" data-xlab="m" data-ylab="n" style="margin-top:50px; width:300px; height:300px; float:left"></div>
 
 
 

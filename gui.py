@@ -45,9 +45,9 @@ class Container(Widget):
 
     def to_html(self):
         if self.orientation == 'horizontal':
-            return '<table><tr><td>' + '</td>\n<td>'.join(widget.to_html() for widget in self.widgets) + '</td></tr></table>'
+            return '<div class="flex-container-h"><div>' + '</div><div>'.join(widget.to_html() for widget in self.widgets) + '</div></div>'
         else:
-            return '<br/>\n'.join(widget.to_html() for widget in self.widgets)
+            return '<div class="flex-container-v"><div>' + '</div><div>'.join(widget.to_html() for widget in self.widgets) + '</div></div>'
     
     def add(self, item):
         self.widgets.append(item)
