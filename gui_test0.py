@@ -1,4 +1,4 @@
-from my_neuron import h
+from neuron import h
 
 h.load_file('stdrun.hoc')
 
@@ -11,16 +11,16 @@ ic.amp = 40  # since by default a very large section
 ic.delay = 1
 ic.dur = 1
 
-is_checked = 0
+#is_checked = 0
 
 h.xpanel("Hello world")
 h.xlabel("Here is some text")
-h.xvalue("h.t", "h.t")
-h.xcheckbox("a checkbox", "is_checked")
+h.xvalue("h.t", "t")
+#h.xcheckbox("a checkbox", "is_checked")
 h.xbutton("finitialize", "h.finitialize(-65)")
 h.xbutton("run", "h.run()")
-g = h.Graph()
-g.addvar("v", "seg.v")
+#g = h.Graph()
+#g.addvar("v", "seg.v")
 h.xpanel()
 
-h.finitialize(-65)
+#h.finitialize(-65)

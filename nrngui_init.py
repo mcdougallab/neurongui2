@@ -21,12 +21,13 @@ from neuron.gui2.utilities import _segment_3d_pts
 from neuron.gui2.rangevar import rangevars_present
 import neuron
 import ctypes
+from gui_callback import gui_callback
 
 HocObject = hoc.HocObject
 try:
     base_path = os.path.split(__file__)[0]
 except:
-    # TODO: remove this. bad
+    # TODO: remove this. bad (related to the cef importing scripts probelm)
     base_path = 'c:\\Users\\Lia\\Desktop\\neurongui_wrapper'
 
 _structure_change_count = neuron.nrn_dll_sym('structure_change_cnt', ctypes.c_int)
@@ -1048,6 +1049,12 @@ shared_locals = {'make_browser': make_browser, 'quit': sys.exit, 'weakdict':brow
 # todo: should this be here or in main
 import gui
 gui.make_browser_html = make_browser_html
+
+try:
+    nrnpy_set_gui_callback = nrn_dll_sym('nrnpy_set_gui_callback')
+    nrnpy_set_gui_callback(ctypes.py_object(gui_callback))
+except: 
+    print("Gui redirect function not found")
 
 if __name__ == '__main__':
     main()
