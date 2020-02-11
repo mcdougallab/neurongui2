@@ -1,31 +1,60 @@
+import uuid
+from neuron import h
+
+import logging
+logging.basicConfig(level=logging.DEBUG, filename="mylog.txt")
+
 make_browser_html = None
 
 class Widget:
-    def to_html():
+    def to_html(self):
         raise NotImplementedError()
+    def mappings(self):
+        return {}
 
 
 class XValue(Widget):
     def __init__(self, prompt, variable):
+        logging.debug("variable: %s", variable)
         self.prompt = prompt
-        self.variable = variable
+        if (isinstance(variable, str)):
+            self.ptr = getattr(h, "_ref_" + variable)
+        else:   #TODO: if not pointer
+            self.ptr = variable
+        self.uuid = uuid.uuid4().hex    # uuid4 because prob more secure than uuid1 
+        logging.debug("uuid: %s", self.uuid)
+
+    def mappings(self):
+        logging.debug("got to xvalue mappings")
+        return {self.uuid: self.ptr}
 
     def to_html(self):
-        return """<input type="number" data-variable="{}"><label> {}</label>""".format(self.variable, self.prompt)
+        return """<input type="number" data-variable="{}"><label> {}</label>""".format(self.uuid, self.prompt)
 
 class XCheckBox(Widget):
+    #TODO: this and also statebutton needs to be implemented more carefully. see gui docs
     def __init__(self, prompt, variable):
         self.prompt = prompt
-        self.variable = variable
+        if (isinstance(variable, str)):
+            self.ptr = getattr(h, "_ref_" + variable)
+        else:   
+            self.ptr = variable
+        self.uuid = uuid.uuid4().hex    
+
+    def mappings(self):
+        return {self.uuid: self.ptr}
 
     def to_html(self):
-        return """<input type="checkbox" data-variable="{}"><label> {}</label>""".format(self.variable, self.prompt)
+        return """<input type="checkbox" data-variable="{}"><label> {}</label>""".format(self.uuid, self.prompt)
 
 
-class XButton(Widget):
+class XButton(Widget): 
     def __init__(self, prompt, callback):
         self.prompt = prompt
         self.callback = callback
+
+    def mappings(self):
+        return {}
 
     def to_html(self):
         return """<button data-onclick="{}">{}</button>""".format(self.callback, self.prompt)
@@ -33,6 +62,9 @@ class XButton(Widget):
 class XLabel(Widget):
     def __init__(self, text):
         self.text = text
+
+    def mappings(self):
+        return {}
 
     def to_html(self):
         return "{}".format(self.text)
@@ -51,6 +83,12 @@ class Container(Widget):
     
     def add(self, item):
         self.widgets.append(item)
+    
+    def mappings(self):
+        result = {}
+        for widget in self.widgets:
+            result.update(widget.mappings())
+        return result
         
 
 class Window(Container):
@@ -122,7 +160,7 @@ def xpanel(*args):
         active_container.append(active_window)
     else:
         html = active_window.to_html()
-        make_browser_html(html, title=active_window.title)
+        make_browser_html(html, user_mappings=active_window.mappings(), title=active_window.title)
         active_window = None
 
 
@@ -138,11 +176,10 @@ def xcheckbox(prompt, variable):
 def xlabel(text):
     active_container[-1].add(XLabel(text))
 
-
 def xbutton(prompt, callback):
     active_container[-1].add(XButton(prompt, callback))
 
-class Graph(Widget):
+class Graph(Widget): #TODO
     def __init__(self):
         self.label = []
         self.varname = []

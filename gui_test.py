@@ -20,15 +20,15 @@ vbox = h.VBox()
 vbox.intercept(True)
 
 h.xlabel("Here is some text")
-h.xvalue("h.t", "h.t")
+h.xvalue("h.t", "t")
 h.xbutton("finitialize", "h.finitialize(-65)")
 h.xbutton("run", "h.run()")
 
 vbox.intercept(False)
 vbox.map()
 
-g = h.Graph()
-g.addvar("v", "seg.v")
+#g = h.Graph()
+#g.addvar("v", "seg.v")
 hbox.intercept(False)
 hbox.map()
 
