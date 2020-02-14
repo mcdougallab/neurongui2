@@ -67,6 +67,7 @@ function update_html_variable_displays(changed, deleted) {
     $.each(changed, function(key, value) {
         $(`span[data-variable="${key}"]`).text(value);
         $(`input[data-variable="${key}"]`).val(value);
+        $(`input:checkbox[data-variable="${key}"]`).prop('checked', Boolean(value))
     });
     $.each(deleted, function(index, key) {
         // deleted variables. individual handling maybe?
@@ -285,7 +286,8 @@ $('input').keypress(function(event){
 $('input').focusout(function() {   // also update if focus is lost on input
     _update_vars(browser_id, $(this).attr('data-variable'), $(this).val())
 });
-$('input:checkbox').change(function() {   // also update if focus is lost on input
+$('input:checkbox').change(function() {   
+    console.log("checkbox state: ", $(this).is(':checked'));
     _update_vars(browser_id, $(this).attr('data-variable'), $(this).is(':checked'))
 });
 

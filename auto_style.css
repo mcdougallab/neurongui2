@@ -37,8 +37,19 @@ button {
     display: block;
     height: 40px;
     text-align: center;
-    width: 50%;
+    width: 100px;
     float: left;
     color: white;
     background-color: #341575;
+}
+button.state {
+    height: 30px;
+    width: 60px;
+    color: black;
+    background-color: lightgrey;
+    border: 5px solid darkgrey;
+}
+button.state.active {
+    background-color: greenyellow;
+    border: 5px solid lightgrey;
 }

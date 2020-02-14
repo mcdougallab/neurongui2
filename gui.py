@@ -1,5 +1,6 @@
 import uuid
 from neuron import h
+import warnings
 
 import logging
 logging.basicConfig(level=logging.DEBUG, filename="mylog.txt")
@@ -33,20 +34,33 @@ class XValue(Widget):
 
 class XCheckBox(Widget):
     #TODO: this and also statebutton needs to be implemented more carefully. see gui docs
-    def __init__(self, prompt, variable):
+    def __init__(self, prompt, state_variable, callback):
         self.prompt = prompt
-        if (isinstance(variable, str)):
-            self.ptr = getattr(h, "_ref_" + variable)
-        else:   
-            self.ptr = variable
+        self.callback = callback
+        self.state_ref = state_variable
         self.uuid = uuid.uuid4().hex    
 
     def mappings(self):
-        return {self.uuid: self.ptr}
+        return {self.uuid: self.state_ref}
 
     def to_html(self):
-        return """<input type="checkbox" data-variable="{}"><label> {}</label>""".format(self.uuid, self.prompt)
+        if self.callback:
+            return """<input type="checkbox" data-variable="{}" data-onclick="{}"><label> {}</label>""".format(self.uuid, self.callback, self.prompt)
+        else:
+            return """<input type="checkbox" data-variable="{}"><label> {}</label>""".format(self.uuid, self.prompt)
 
+
+
+"""class XStateButton(Widget):
+    def __init__(self, prompt, state_variable, callback):
+        #TODO: deal specially with state_variable possibilities (hoc ref; tuple then getattr)
+
+    def mappings(self):
+        return {self.uuid: self.state_ref}
+
+    def to_html(self):
+        return """"""
+    """
 
 class XButton(Widget): 
     def __init__(self, prompt, callback):
@@ -167,11 +181,12 @@ def xpanel(*args):
 def xvalue(prompt, variable):
     active_container[-1].add(XValue(prompt, variable))
 
-def xcheckbox(prompt, variable):
-    active_container[-1].add(XCheckBox(prompt, variable))
-    import warnings
-    warnings.warn('one of the checkbox sync directions is not yet implemented')
+def xcheckbox(prompt, state_variable, callback=None):
+    active_container[-1].add(XCheckBox(prompt, state_variable, callback))
 
+"""def xstatebutton(prompt, state_variable, callback=None):
+    active_container[-1].add(XStateButton(prompt, state_variable, callback))
+    warnings.warn('one of the statebutton sync directions is not yet implemented')"""
 
 def xlabel(text):
     active_container[-1].add(XLabel(text))
