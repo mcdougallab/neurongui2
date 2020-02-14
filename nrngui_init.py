@@ -859,10 +859,10 @@ def monitor_browser_vars(this_browser):
     timer.start()
     return timer
 
-def _py_function_handler(browser_id, function_string):
+def _py_function_handler(browser_id, function):
     global browser_weakvaldict 
     # first check user mappings then shared_locals for the function
-    exec(function_string, shared_locals, browser_weakvaldict[browser_id].user_mappings)
+    exec(function, shared_locals, browser_weakvaldict[browser_id].user_mappings)
 
 def _flag_browser_ready(browser_id):
     global browser_weakvaldict
@@ -879,16 +879,20 @@ def lookup(this_browser, variable, action, newValue=None):
         # TODO: would it be faster to separate ptrs from not pointers in advance?
         #       (maybe, maybe not)
         if variable in mappings.keys():
+            result = mappings.get(variable)
             if action == "get":
-                result = mappings.get(variable)
                 if isinstance(result, HocObject):
                     return result[0]
+                elif isinstance(result, tuple):
+                    return getattr(result[0], result[1])
                 return result
             elif action == "set":
-                if isinstance(mappings[variable], HocObject):
-                    mappings[variable][0] = newValue
+                if isinstance(result, HocObject):
+                    result[0] = newValue
+                elif isinstance(result, tuple):
+                    return setattr(result[0], result[1], newValue)
                 else:
-                    mappings[variable] = newValue
+                    result = newValue
         elif variable in shared_locals.keys():
             if action == "get":
                 return shared_locals.get(variable)

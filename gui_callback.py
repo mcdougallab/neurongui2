@@ -60,6 +60,7 @@ fn_map = {
     'xlabel': xlabel,
     'xvalue': xvalue,
     'xcheckbox': xcheckbox,
+    'xstatebutton': xstatebutton,
     'xbutton': xbutton
 }
 
