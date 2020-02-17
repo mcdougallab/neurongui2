@@ -33,7 +33,6 @@ class XValue(Widget):
         return """<input type="number" data-variable="{}"><label> {}</label>""".format(self.uuid, self.prompt)
 
 class XCheckBox(Widget):
-    #TODO: this and also statebutton needs to be implemented more carefully. see gui docs
     def __init__(self, prompt, state_variable, callback):
         self.prompt = prompt
         self.callback = callback
@@ -50,17 +49,22 @@ class XCheckBox(Widget):
             return """<input type="checkbox" data-variable="{}"><label> {}</label>""".format(self.uuid, self.prompt)
 
 
-
-"""class XStateButton(Widget):
+class XStateButton(Widget):
     def __init__(self, prompt, state_variable, callback):
-        #TODO: deal specially with state_variable possibilities (hoc ref; tuple then getattr)
+        self.prompt = prompt
+        self.callback = callback
+        self.state_ref = state_variable
+        self.uuid = uuid.uuid4().hex    
 
     def mappings(self):
         return {self.uuid: self.state_ref}
 
     def to_html(self):
-        return """"""
-    """
+        if self.callback:
+            return """<button class="state" data-variable="{}" data-onclick="{}">{}</button>""".format(self.uuid, self.callback, self.prompt)
+        else:
+            return """<button class="state" data-variable="{}">{}</button>""".format(self.uuid, self.prompt)
+
 
 class XButton(Widget): 
     def __init__(self, prompt, callback):
@@ -184,9 +188,8 @@ def xvalue(prompt, variable):
 def xcheckbox(prompt, state_variable, callback=None):
     active_container[-1].add(XCheckBox(prompt, state_variable, callback))
 
-"""def xstatebutton(prompt, state_variable, callback=None):
+def xstatebutton(prompt, state_variable, callback=None):
     active_container[-1].add(XStateButton(prompt, state_variable, callback))
-    warnings.warn('one of the statebutton sync directions is not yet implemented')"""
 
 def xlabel(text):
     active_container[-1].add(XLabel(text))
