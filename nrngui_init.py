@@ -278,6 +278,7 @@ class NEURONWindow(NEURONFrame):
         self.user_mappings = user_mappings
         self.rel_vars = []
         self.graph_vars = {}    # graph vector dictionary
+        self.browser_sent_vars = {} # keep track not to resend variable just sent from browser
         self.fih = 0    # tracker for whether fInitialize has happened
         self.t_tracker = 0  #tracker for length of time (or other) vector
         self.ready_status = 1   #browser sends signal that it's ready when done updating graphs
@@ -946,11 +947,14 @@ def lookup_graph_var(this_browser, variable):
 
 def _update_vars(browser_id, variable, value):
     global browser_weakvaldict
+    this_browser = browser_weakvaldict[browser_id]
     # update any variables sent in by the browser
     #TODO: consider; # can this lead to discrepancies betw shared_locals and user_mappings?
     if value == '':
         value = None
-    lookup(browser_weakvaldict[browser_id], variable, "set", float(value))
+    lookup(this_browser, variable, "set", float(value))
+    # make sure you don't send it back to browser next loop
+    this_browser.browser_sent_vars[variable] = value
 
 def _set_relevant_vars(to_update):
     global browser_weakvaldict
@@ -1021,6 +1025,10 @@ def _update_browser_vars(this_browser, locals_copy):
         _update_shapeplot_menus()
 
     # create dictionary of the changed variables 
+    #locals_copy.update(this_browser.browser_sent_vars) # don't resend recently updated
+    #if this_browser.browser_sent_vars:
+        #print(this_browser.browser_sent_vars)
+    this_browser.browser_sent_vars = {}
     changed_vars, deleted_vars = find_changed_vars(this_browser, locals_copy)
     locals_copy.update(changed_vars)
     # handle deletions separately

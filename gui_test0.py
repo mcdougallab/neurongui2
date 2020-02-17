@@ -25,11 +25,14 @@ def onpress():
         print("value: ", is_checked[0])
     return
 
+is_checked2 = h.ref(0)
+
 h.xpanel("Hello world")
 h.xlabel("Here is some text")
 h.xvalue("h.t", "t")
 #h.xcheckbox("a checkbox", is_checked, "onpress()")
 h.xcheckbox("a checkbox", (is_checked, 'checked'), "onpress()")
+h.xstatebutton("Toggle", is_checked2)
 h.xbutton("finitialize", "h.finitialize(-65)")
 h.xbutton("run", "h.run()")
 #g = h.Graph()

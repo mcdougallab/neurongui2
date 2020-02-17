@@ -67,7 +67,14 @@ function update_html_variable_displays(changed, deleted) {
     $.each(changed, function(key, value) {
         $(`span[data-variable="${key}"]`).text(value);
         $(`input[data-variable="${key}"]`).val(value);
-        $(`input:checkbox[data-variable="${key}"]`).prop('checked', Boolean(value))
+        $(`input:checkbox[data-variable="${key}"]`).prop('checked', Boolean(value));
+        // toggle statebutton
+        $(`button[class="state"][data-variable="${key}"]`).each(function() {
+            console.log("VALUE: ", value);
+            if (Boolean(value)) {$(this).addClass("active")} else {$(this).removeClass("active")}
+        });
+        console.log("python says button: ", $(`button[class="state"]`).hasClass("active"));
+        console.log("python says checkbox: ", $(this).is(':checked'));
     });
     $.each(deleted, function(index, key) {
         // deleted variables. individual handling maybe?
@@ -268,11 +275,6 @@ function update_graph_vectors(graph_vars, action) {
     _flag_browser_ready(browser_id);
 };
 
-// attach button clicks to correct python functions
-$('[data-onclick]').click(function() {
-    _py_function_handler(browser_id, $(this).attr('data-onclick'));
-});
-
 // behavior for all input (could specify to a certain class of inputs if needed)
 $('input').keypress(function(event){
     // from https://www.mkyong.com/jquery/how-to-check-if-an-enter-key-is-pressed-with-jquery/
@@ -288,7 +290,18 @@ $('input').focusout(function() {   // also update if focus is lost on input
 });
 $('input:checkbox').change(function() {   
     console.log("checkbox state: ", $(this).is(':checked'));
-    _update_vars(browser_id, $(this).attr('data-variable'), $(this).is(':checked'))
+    _update_vars(browser_id, $(this).attr('data-variable'), $(this).is(':checked'));
+});
+// implement state button to function like checkbox
+$('button[class="state"]').click(function() {
+    $(this).toggleClass("active");
+    console.log("statebutton state: ", $(this).hasClass("active"));
+    _update_vars(browser_id, $(this).attr('data-variable'), $(this).hasClass("active"));
+})
+
+// attach button clicks to correct python functions
+$('[data-onclick]').click(function() {
+    _py_function_handler(browser_id, $(this).attr('data-onclick'));
 });
 
 
