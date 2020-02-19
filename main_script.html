@@ -69,12 +69,12 @@ function update_html_variable_displays(changed, deleted) {
         $(`input[data-variable="${key}"]`).val(value);
         $(`input:checkbox[data-variable="${key}"]`).prop('checked', Boolean(value));
         // toggle statebutton
-        $(`button[class="state"][data-variable="${key}"]`).each(function() {
-            console.log("VALUE: ", value);
-            if (Boolean(value)) {$(this).addClass("active")} else {$(this).removeClass("active")}
+        $(`button.state[data-variable="${key}"]`).each(function() {
+            console.log("python sends value: ", value);
+            console.log(Boolean(value));
+            if (Boolean(value)) {$(this).addClass("active")} else {$(this).removeClass("active"); console.log("deactivating");}
         });
-        console.log("python says button: ", $(`button[class="state"]`).hasClass("active"));
-        console.log("python says checkbox: ", $(this).is(':checked'));
+
     });
     $.each(deleted, function(index, key) {
         // deleted variables. individual handling maybe?

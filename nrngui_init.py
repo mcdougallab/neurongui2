@@ -23,6 +23,9 @@ import neuron
 import ctypes
 from gui_callback import gui_callback
 
+import logging
+logging.basicConfig(level=logging.DEBUG, filename="mylog.txt")
+
 HocObject = hoc.HocObject
 try:
     base_path = os.path.split(__file__)[0]
@@ -1025,9 +1028,9 @@ def _update_browser_vars(this_browser, locals_copy):
         _update_shapeplot_menus()
 
     # create dictionary of the changed variables 
-    #locals_copy.update(this_browser.browser_sent_vars) # don't resend recently updated
+    locals_copy.update(this_browser.browser_sent_vars) # don't resend recently updated
     #if this_browser.browser_sent_vars:
-        #print(this_browser.browser_sent_vars)
+        #logging.debug(str(this_browser.browser_sent_vars))
     this_browser.browser_sent_vars = {}
     changed_vars, deleted_vars = find_changed_vars(this_browser, locals_copy)
     locals_copy.update(changed_vars)
