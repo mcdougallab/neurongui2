@@ -174,6 +174,7 @@ class NEURONFrame(wx.Frame):
         old_command = current_shell.getCommand()
         current_shell.clearCommand()
         current_shell.write('\n')
+        #old_pos = current_shell.GetCurrentPos()
         h.load_file('stdlib.hoc')
         h.load_file('import3d.hoc')
         reader = h.Import3d_SWC_read()
@@ -183,7 +184,7 @@ class NEURONFrame(wx.Frame):
         current_shell.write(old_command)
 
     def run_script(self, *args, **kwargs):
-        # TODO: we clear entire commands from the shell before running the script
+        # TODO: we clear multiline commands from the shell before running the script
         #       but only restore the active
         with wx.FileDialog(self,
                         'Select script to run',
@@ -866,7 +867,14 @@ def monitor_browser_vars(this_browser):
 def _py_function_handler(browser_id, function):
     global browser_weakvaldict 
     # first check user mappings then shared_locals for the function
+    old_command = current_shell.getCommand()
+    current_shell.clearCommand()
+    current_shell.write('\n')
+    old_pos = current_shell.GetCurrentPos()
     exec(function, shared_locals, browser_weakvaldict[browser_id].user_mappings)
+    if current_shell.GetCurrentPos() != old_pos:
+        current_shell.prompt()
+    current_shell.write(old_command)
 
 def _flag_browser_ready(browser_id):
     global browser_weakvaldict
@@ -956,6 +964,8 @@ def _update_vars(browser_id, variable, value):
     if value == '':
         value = None
     lookup(this_browser, variable, "set", float(value))
+    #logging.debug("variable sent from html: "+variable+" "+str(value))
+    #print("python knows as: ", str(lookup(this_browser, variable, "get")))
     # make sure you don't send it back to browser next loop
     this_browser.browser_sent_vars[variable] = value
 
@@ -997,6 +1007,7 @@ def find_changed_vars(this_browser, old_copy):
         if (current is None) and (v in old_copy.keys()):
             deleted.append(v)
         elif current != old_copy.get(v):
+            logging.debug("changed var: "+v+" "+str(current))
             if isinstance(current, list):
                 changed[v] = copy.copy(current)
             else:
