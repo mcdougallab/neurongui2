@@ -66,7 +66,7 @@ _set_relevant_vars(JSON.stringify([to_update, graph_vars, browser_id]));
 function update_html_variable_displays(changed, deleted) {
     $.each(changed, function(key, value) {
         $(`span[data-variable="${key}"]`).text(value);
-        $(`input[data-variable="${key}"]`).val(value);
+        $(`input[data-variable="${key}"]`).not(':checkbox').val(value);
         $(`input:checkbox[data-variable="${key}"]`).prop('checked', Boolean(value));
         // toggle statebutton
         $(`button.state[data-variable="${key}"]`).each(function() {
@@ -79,7 +79,7 @@ function update_html_variable_displays(changed, deleted) {
     $.each(deleted, function(index, key) {
         // deleted variables. individual handling maybe?
         $(`span[data-variable="${key}"]`).text("");
-        $(`input[data-variable="${key}"]`).val("");
+        $(`input[data-variable="${key}"]`).not(':checkbox').val("");
     });
 }
 
@@ -276,7 +276,7 @@ function update_graph_vectors(graph_vars, action) {
 };
 
 // behavior for all input (could specify to a certain class of inputs if needed)
-$('input').keypress(function(event){
+$('input').not(':checkbox').keypress(function(event){
     // from https://www.mkyong.com/jquery/how-to-check-if-an-enter-key-is-pressed-with-jquery/
     var keycode = (event.keyCode ? event.keyCode : event.which);
     if (keycode == '13'){
@@ -285,22 +285,26 @@ $('input').keypress(function(event){
     }
     event.stopPropagation()
 });
-$('input').focusout(function() {   // also update if focus is lost on input
-    _update_vars(browser_id, $(this).attr('data-variable'), $(this).val())
+$('input').not(':checkbox').focusout(function() {   // also update if focus is lost on input
+    _update_vars(browser_id, $(this).attr('data-variable'), $(this).val()) //FIX THIS
 });
 $('input:checkbox').change(function() {   
     console.log("checkbox state: ", $(this).is(':checked'));
     _update_vars(browser_id, $(this).attr('data-variable'), $(this).is(':checked'));
+    if ($(this).attr('data-onclick')) {
+        _py_function_handler(browser_id, $(this).attr('data-onclick'));}
 });
 // implement state button to function like checkbox
 $('button[class="state"]').click(function() {
     $(this).toggleClass("active");
     console.log("statebutton state: ", $(this).hasClass("active"));
     _update_vars(browser_id, $(this).attr('data-variable'), $(this).hasClass("active"));
+    if ($(this).attr('data-onclick')) {
+        _py_function_handler(browser_id, $(this).attr('data-onclick'));}
 })
 
 // attach button clicks to correct python functions
-$('[data-onclick]').click(function() {
+$('[data-onclick]').not('input:checkbox').not('button.state').click(function() {
     _py_function_handler(browser_id, $(this).attr('data-onclick'));
 });
 
