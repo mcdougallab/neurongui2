@@ -70,8 +70,20 @@ class XButton(Widget):
     def __init__(self, prompt, callback):
         self.prompt = prompt
         self.callback = callback
+        # In progress: making button inputs compatible
+        """if isinstance(callback, tuple):
+            arg = callback[1]
+            if isinstance(callback[1], tuple):
+                self.callback = lambda arg: callback[0](*arg)
+            else:
+                self.callback = lambda arg: callback[0](arg)
+        else:
+            self.callback = callback
+        self.callback = callback
+        self.uuid = uuid.uuid4().hex"""
 
     def mappings(self):
+        #return {self.uuid, self.callback}
         return {}
 
     def to_html(self):
