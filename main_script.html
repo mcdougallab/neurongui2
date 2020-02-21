@@ -70,9 +70,7 @@ function update_html_variable_displays(changed, deleted) {
         $(`input:checkbox[data-variable="${key}"]`).prop('checked', Boolean(value));
         // toggle statebutton
         $(`button.state[data-variable="${key}"]`).each(function() {
-            console.log("python sends value: ", value);
-            console.log(Boolean(value));
-            if (Boolean(value)) {$(this).addClass("active")} else {$(this).removeClass("active"); console.log("deactivating");}
+            if (Boolean(value)) {$(this).addClass("active")} else {$(this).removeClass("active");}
         });
 
     });
@@ -289,7 +287,6 @@ $('input').not(':checkbox').focusout(function() {   // also update if focus is l
     _update_vars(browser_id, $(this).attr('data-variable'), $(this).val()) //FIX THIS
 });
 $('input:checkbox').change(function() {   
-    console.log("checkbox state: ", $(this).is(':checked'));
     _update_vars(browser_id, $(this).attr('data-variable'), $(this).is(':checked'));
     if ($(this).attr('data-onclick')) {
         _py_function_handler(browser_id, $(this).attr('data-onclick'));}
@@ -297,7 +294,6 @@ $('input:checkbox').change(function() {
 // implement state button to function like checkbox
 $('button[class="state"]').click(function() {
     $(this).toggleClass("active");
-    console.log("statebutton state: ", $(this).hasClass("active"));
     _update_vars(browser_id, $(this).attr('data-variable'), $(this).hasClass("active"));
     if ($(this).attr('data-onclick')) {
         _py_function_handler(browser_id, $(this).attr('data-onclick'));}

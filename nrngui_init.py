@@ -197,8 +197,15 @@ class NEURONFrame(wx.Frame):
         # store the old command
         #old_command = current_shell.getMultilineCommand()
         old_command = current_shell.getCommand()
+        reset_cursor = True
+        endpos = current_shell.GetTextLength()
+        oldpos = current_shell.GetCurrentPos()
+        if oldpos == endpos:
+            reset_cursor = False
+        if reset_cursor:
+            current_shell.SetCurrentPos(endpos)
         current_shell.clearCommand()
-        current_shell.write('\n')
+        #current_shell.write('\n')
         if extension == '.py':
             with open(path) as f:
                 code = compile(f.read(), path, 'exec')
@@ -209,9 +216,13 @@ class NEURONFrame(wx.Frame):
         else:
             print('undefined file:', path)
             # TODO: how should we handle "impossible" errors like this?
-        # restore the prompt state
-        current_shell.prompt()
+        # restore the prompt state 
+        if (current_shell.GetCurrentPos()+len(old_command)) != oldpos:
+            current_shell.prompt()
         current_shell.write(old_command)
+        if reset_cursor:
+            current_shell.SetCurrentPos(oldpos)
+            current_shell.SetAnchor(oldpos)
     
     def exit(self, *args, **kwargs):
         # TODO: put any are-you-sure questions here
@@ -815,6 +826,7 @@ def make_terminal(*args, **kwargs):
     current_shell.redirectStdout(True)
     current_shell.redirectStdin(True)
     current_shell.redirectStderr(True)
+    current_shell.StyleClearAll() #TODO: only do this for printed output?
     shell.write("\nType setupSim() or quit() or use the menus or use NEURON as usual\n")
     shell.prompt()
     window.Show(True) 
@@ -868,13 +880,23 @@ def _py_function_handler(browser_id, function):
     global browser_weakvaldict 
     # first check user mappings then shared_locals for the function
     old_command = current_shell.getCommand()
+    reset_cursor = True
+    endpos = current_shell.GetTextLength()
+    oldpos = current_shell.GetCurrentPos()
+    if oldpos == endpos:
+        reset_cursor = False
+    if reset_cursor:
+        current_shell.SetCurrentPos(endpos)
     current_shell.clearCommand()
-    current_shell.write('\n')
-    old_pos = current_shell.GetCurrentPos()
+    #current_shell.write('\n')
     exec(function, shared_locals, browser_weakvaldict[browser_id].user_mappings)
-    if current_shell.GetCurrentPos() != old_pos:
+    if (current_shell.GetCurrentPos()+len(old_command)) != oldpos:
         current_shell.prompt()
     current_shell.write(old_command)
+    if reset_cursor:
+        current_shell.SetCurrentPos(oldpos)
+        current_shell.SetAnchor(oldpos)
+        
 
 def _flag_browser_ready(browser_id):
     global browser_weakvaldict
@@ -964,8 +986,6 @@ def _update_vars(browser_id, variable, value):
     if value == '':
         value = None
     lookup(this_browser, variable, "set", float(value))
-    #logging.debug("variable sent from html: "+variable+" "+str(value))
-    #print("python knows as: ", str(lookup(this_browser, variable, "get")))
     # make sure you don't send it back to browser next loop
     this_browser.browser_sent_vars[variable] = value
 
@@ -1007,7 +1027,6 @@ def find_changed_vars(this_browser, old_copy):
         if (current is None) and (v in old_copy.keys()):
             deleted.append(v)
         elif current != old_copy.get(v):
-            logging.debug("changed var: "+v+" "+str(current))
             if isinstance(current, list):
                 changed[v] = copy.copy(current)
             else:
@@ -1040,8 +1059,6 @@ def _update_browser_vars(this_browser, locals_copy):
 
     # create dictionary of the changed variables 
     locals_copy.update(this_browser.browser_sent_vars) # don't resend recently updated
-    #if this_browser.browser_sent_vars:
-        #logging.debug(str(this_browser.browser_sent_vars))
     this_browser.browser_sent_vars = {}
     changed_vars, deleted_vars = find_changed_vars(this_browser, locals_copy)
     locals_copy.update(changed_vars)
