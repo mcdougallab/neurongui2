@@ -580,7 +580,7 @@ def _update_shapeplot_menus(*args, **kwargs):
     #       no idea how that would have worked, anyway
     # TODO: can we do this without destroying everything?
     # TODO: if plotting different sections, should we treat the lists of allowed rangevars differently?
-    rangevars = rangevars_present(h.allsec())
+    rangevars = rangevars_present(list(h.allsec()))
     for menu in _shapeplot_menus:
         for item in menu.GetMenuItems():
             menu.Delete(item)
@@ -878,19 +878,26 @@ def monitor_browser_vars(this_browser):
 
 def _py_function_handler(browser_id, function):
     global browser_weakvaldict 
+    this_browser = browser_weakvaldict[browser_id]
     # first check user mappings then shared_locals for the function
-    old_command = current_shell.getCommand()
     reset_cursor = True
     endpos = current_shell.GetTextLength()
+    logging.debug("endpos: "+str(endpos))
     oldpos = current_shell.GetCurrentPos()
     if oldpos == endpos:
         reset_cursor = False
     if reset_cursor:
         current_shell.SetCurrentPos(endpos)
+    old_command = current_shell.getCommand()
+    logging.debug("old_command: "+old_command)
     current_shell.clearCommand()
     #current_shell.write('\n')
-    exec(function, shared_locals, browser_weakvaldict[browser_id].user_mappings)
-    if (current_shell.GetCurrentPos()+len(old_command)) != oldpos:
+
+    #exec(function, shared_locals, this_browser.user_mappings)
+    this_browser.user_mappings[function]()
+
+    logging.debug(str(current_shell.GetCurrentPos())+' '+str(endpos)+' '+str(len(old_command)))
+    if (current_shell.GetCurrentPos()+len(old_command)) != endpos:
         current_shell.prompt()
     current_shell.write(old_command)
     if reset_cursor:
