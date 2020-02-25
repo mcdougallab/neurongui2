@@ -16,17 +16,14 @@ class Widget:
 
 class XValue(Widget):
     def __init__(self, prompt, variable):
-        logging.debug("variable: %s", variable)
         self.prompt = prompt
         if (isinstance(variable, str)):
             self.ptr = getattr(h, "_ref_" + variable)
         else:   #TODO: if not pointer
             self.ptr = variable
         self.uuid = uuid.uuid4().hex    # uuid4 because prob more secure than uuid1 
-        logging.debug("uuid: %s", self.uuid)
 
     def mappings(self):
-        logging.debug("got to xvalue mappings")
         return {self.uuid: self.ptr}
 
     def to_html(self):
@@ -69,25 +66,24 @@ class XStateButton(Widget):
 class XButton(Widget): 
     def __init__(self, prompt, callback):
         self.prompt = prompt
-        self.callback = callback
         # In progress: making button inputs compatible
-        """if isinstance(callback, tuple):
+        if isinstance(callback, tuple):
             arg = callback[1]
+            logging.debug("function: "+str(callback[0]))
+            logging.debug("args: "+str(callback[1]))
             if isinstance(callback[1], tuple):
-                self.callback = lambda arg: callback[0](*arg)
+                self.callback = lambda: callback[0](*arg)
             else:
-                self.callback = lambda arg: callback[0](arg)
+                self.callback = lambda: callback[0](arg)
         else:
             self.callback = callback
-        self.callback = callback
-        self.uuid = uuid.uuid4().hex"""
+        self.uuid = uuid.uuid4().hex
 
     def mappings(self):
-        #return {self.uuid, self.callback}
-        return {}
+        return {self.uuid: self.callback}
 
     def to_html(self):
-        return """<button data-onclick="{}">{}</button>""".format(self.callback, self.prompt)
+        return """<button data-onclick="{}">{}</button>""".format(self.uuid, self.prompt)
 
 class XLabel(Widget):
     def __init__(self, text):
@@ -190,6 +186,7 @@ def xpanel(*args):
         active_container.append(active_window)
     else:
         html = active_window.to_html()
+        logging.debug(str(active_window.mappings()))
         make_browser_html(html, user_mappings=active_window.mappings(), title=active_window.title)
         active_window = None
 

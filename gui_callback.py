@@ -39,9 +39,9 @@ def gui_callback(*args):
     fn = args[0]
     obj = args[1]
     params = args[2:]
-    logging.debug("fn: %s", fn)
-    logging.debug("obj: %r", obj)
-    logging.debug("params: %r", params)
+    #logging.debug("fn: %s", fn)
+    #logging.debug("obj: %r", obj)
+    #logging.debug("params: %r", params)
     if fn in fn_map:
         fn_map[fn](*params)
         return True
@@ -55,3 +55,4 @@ def gui_callback(*args):
         return float(input('your choice: '))
     print('do something else')
     return True
+

@@ -18,7 +18,7 @@ class Ref():
 is_checked = Ref(0)
 
 def onpress():
-    print("checkbox changed!")
+    print("checkbox changed! as if")
     if isinstance(is_checked, Ref):
         print("value: ", is_checked.checked)
     else:
@@ -26,11 +26,17 @@ def onpress():
     return
 
 def onpress2():
-    print("state changed!")
+    """print("state changed!")
     if isinstance(is_checked2, Ref):
         print("value: ", is_checked2.checked)
     else:
-        print("value: ", is_checked2[0])
+        print("value: ", is_checked2[0])"""
+    return
+
+def buttontest(thing1, thing2):
+    print("button test worked!")
+    print(thing1)
+    print(thing2)
     return
 
 is_checked2 = h.ref(0)
@@ -39,10 +45,11 @@ h.xpanel("Hello world")
 h.xlabel("Here is some text")
 h.xvalue("h.t", "t")
 #h.xcheckbox("a checkbox", is_checked, "onpress()")
-h.xcheckbox("a checkbox", (is_checked, 'checked'), "onpress()")
-h.xstatebutton("Toggle", is_checked2, "onpress2()")
-h.xbutton("finitialize", "h.finitialize(-65)")
-h.xbutton("run", "h.run()")
+#h.xcheckbox("a checkbox", (is_checked, 'checked'), "onpress()")
+#h.xstatebutton("Toggle", is_checked2, "onpress2()")
+#h.xbutton("finitialize", "h.finitialize(-65)")
+#h.xbutton("run", "h.run()")
+h.xbutton("test", (buttontest, ("hallo", "goodbye")))
 #g = h.Graph()
 #g.addvar("v", "seg.v")
 h.xpanel()
