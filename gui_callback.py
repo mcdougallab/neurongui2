@@ -30,7 +30,8 @@ fn_map = {
     'xcheckbox': xcheckbox,
     'xstatebutton': xstatebutton,
     'xbutton': xbutton,
-    'xpvalue': xvalue
+    'xpvalue': xvalue,
+    'xvarlabel': xvarlabel
 }
 
 def gui_callback(*args):

@@ -280,6 +280,9 @@ $('input').not(':checkbox').keypress(function(event){
     if (keycode == '13'){
         _update_vars(browser_id, $(this).attr('data-variable'), $(this).val())
         $(this).blur()
+        if ($(this).attr('data-enter')) {
+            _py_function_handler(browser_id, $(this).attr('data-onenter'));
+        }
     }
     event.stopPropagation()
 });

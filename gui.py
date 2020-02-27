@@ -15,7 +15,7 @@ class Widget:
 
 
 class XValue(Widget):
-    def __init__(self, prompt, variable):
+    def __init__(self, prompt, variable, boolean_deflt, action, boolean_canrun):
         self.prompt = prompt
         if (isinstance(variable, str)):
             self.ptr = getattr(h, "_ref_" + variable)
@@ -23,42 +23,95 @@ class XValue(Widget):
             self.ptr = variable
         self.uuid = uuid.uuid4().hex    # uuid4 because prob more secure than uuid1 
 
+        if boolean_deflt:
+            # TODO add a checkbox that is checked when value is not at default
+            # involves a state variable for checkbox and storing original value somewhere
+            warnings.warn("Checkbox tied to xvalue not yet implemented.")
+        self.callback = None
+        if action is not None:
+            self.uuid2 = uuid.uuid4().hex
+            if isinstance(callback, tuple): 
+                arg = callback[1]
+                if isinstance(callback[1], tuple):
+                    self.callback = lambda: callback[0](*arg)
+                else:
+                    self.callback = lambda: callback[0](arg)
+            else:
+                self.callback = callback
+        if boolean_canrun:
+            # TODO change the label to a button, callback when either button is pressed or value is changed
+            warnings.warn("Xvalue callback button appearances not yet implemented.")
+
     def mappings(self):
-        return {self.uuid: self.ptr}
+        if self.callback:
+            return{self.uuid: self.ptr, self.uuid2: self.callback}
+        else:
+            return {self.uuid: self.ptr}
 
     def to_html(self):
-        return """<input type="number" data-variable="{}"><label> {}</label>""".format(self.uuid, self.prompt)
+        if self.callback:
+            return """<input type="number" data-variable="{}" data-onenter="{}"><label> {}</label>""".format(self.uuid, self.uuid2, self.prompt)
+        else:
+            return """<input type="number" data-variable="{}"><label> {}</label>""".format(self.uuid, self.prompt)
 
 class XCheckBox(Widget):
     def __init__(self, prompt, state_variable, callback):
         self.prompt = prompt
-        self.callback = callback
         self.state_ref = state_variable
+        if isinstance(callback, tuple): 
+            arg = callback[1]
+            logging.debug("function: "+str(callback[0]))
+            logging.debug("args: "+str(callback[1]))
+            if isinstance(callback[1], tuple):
+                self.callback = lambda: callback[0](*arg)
+            else:
+                self.callback = lambda: callback[0](arg)
+        else:
+            self.callback = callback
+
         self.uuid = uuid.uuid4().hex    
+        self.uuid2 = uuid.uuid4().hex
 
     def mappings(self):
-        return {self.uuid: self.state_ref}
+        if self.callback:
+            return {self.uuid: self.state_ref, self.uuid2: self.callback}
+        else:
+            return {self.uuid: self.state_ref}
 
     def to_html(self):
         if self.callback:
-            return """<input type="checkbox" data-variable="{}" data-onclick="{}"><label> {}</label>""".format(self.uuid, self.callback, self.prompt)
+            return """<label class="checkbox"><input type="checkbox" data-variable="{}" data-onclick="{}"> {}</label>""".format(self.uuid, self.uuid2, self.prompt)
         else:
-            return """<input type="checkbox" data-variable="{}"><label> {}</label>""".format(self.uuid, self.prompt)
+            return """<label class="checkbox"><input type="checkbox" data-variable="{}"> {}</label>""".format(self.uuid, self.prompt)
 
 
 class XStateButton(Widget):
     def __init__(self, prompt, state_variable, callback):
         self.prompt = prompt
-        self.callback = callback
         self.state_ref = state_variable
-        self.uuid = uuid.uuid4().hex    
+        if isinstance(callback, tuple): # allow input on callback. Unlikely for statebutton but available.
+            arg = callback[1]
+            logging.debug("function: "+str(callback[0]))
+            logging.debug("args: "+str(callback[1]))
+            if isinstance(callback[1], tuple):
+                self.callback = lambda: callback[0](*arg)
+            else:
+                self.callback = lambda: callback[0](arg)
+        else:
+            self.callback = callback
+
+        self.uuid = uuid.uuid4().hex   
+        self.uuid2 = uuid.uuid4().hex 
 
     def mappings(self):
-        return {self.uuid: self.state_ref}
+        if self.callback:
+            return {self.uuid: self.state_ref, self.uuid2: self.callback}
+        else:
+            return {self.uuid: self.state_ref}
 
     def to_html(self):
         if self.callback:
-            return """<button class="state" data-variable="{}" data-onclick="{}">{}</button>""".format(self.uuid, self.callback, self.prompt)
+            return """<button class="state" data-variable="{}" data-onclick="{}">{}</button>""".format(self.uuid, self.uuid2, self.prompt)
         else:
             return """<button class="state" data-variable="{}">{}</button>""".format(self.uuid, self.prompt)
 
@@ -66,7 +119,6 @@ class XStateButton(Widget):
 class XButton(Widget): 
     def __init__(self, prompt, callback):
         self.prompt = prompt
-        # In progress: making button inputs compatible
         if isinstance(callback, tuple):
             arg = callback[1]
             logging.debug("function: "+str(callback[0]))
@@ -94,6 +146,19 @@ class XLabel(Widget):
 
     def to_html(self):
         return "{}".format(self.text)
+
+class XVarLabel(Widget):
+    def __init__(self, strref):
+        self.strref = strref
+        self.uuid = uuid.uuid4().hex
+
+    def mappings(self):
+        return {self.uuid: self.strref}
+
+    def to_html(self):
+        #TODO make this dynamic text in html.  may need special update handling from changing the strref
+        warnings.warn("xvarlabel not yet implemented")
+        return 
 
 
 class Container(Widget):
@@ -186,13 +251,13 @@ def xpanel(*args):
         active_container.append(active_window)
     else:
         html = active_window.to_html()
-        logging.debug(str(active_window.mappings()))
+        #logging.debug(str(active_window.mappings()))
         make_browser_html(html, user_mappings=active_window.mappings(), title=active_window.title)
         active_window = None
 
 
-def xvalue(prompt, variable):
-    active_container[-1].add(XValue(prompt, variable))
+def xvalue(prompt, variable, boolean_deflt=None, action=None, boolean_canrun=None):
+    active_container[-1].add(XValue(prompt, variable, boolean_deflt, action, boolean_canrun))
 
 def xcheckbox(prompt, state_variable, callback=None):
     active_container[-1].add(XCheckBox(prompt, state_variable, callback))
@@ -205,6 +270,9 @@ def xlabel(text):
 
 def xbutton(prompt, callback):
     active_container[-1].add(XButton(prompt, callback))
+
+def xvarlabel(strref):
+    active_container[-1].add(XVarLabel(strref))
 
 class Graph(Widget): #TODO
     def __init__(self):
