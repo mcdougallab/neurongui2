@@ -72,6 +72,7 @@ function update_html_variable_displays(changed, deleted) {
         $(`button.state[data-variable="${key}"]`).each(function() {
             if (Boolean(value)) {$(this).addClass("active")} else {$(this).removeClass("active");}
         });
+        $(`label[data-variable="${key}"]`).text(value);
 
     });
     $.each(deleted, function(index, key) {

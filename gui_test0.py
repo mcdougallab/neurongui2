@@ -40,16 +40,18 @@ def buttontest(thing1, thing2):
     return
 
 is_checked2 = h.ref(0)
+my_str = h.ref('yay!')
 
 h.xpanel("Hello world")
-h.xlabel("Here is some text")
-h.xvalue("h.t", "t")
+#h.xlabel("Here is some text")
+#h.xvalue("h.t", "t")
 #h.xcheckbox("a checkbox", is_checked, "onpress()")
-h.xcheckbox("a checkbox", (is_checked, 'checked'), onpress)
-h.xstatebutton("Toggle", is_checked2, onpress2)
+#h.xcheckbox("a checkbox", (is_checked, 'checked'), onpress)
+#h.xstatebutton("Toggle", is_checked2, onpress2)
 #h.xbutton("finitialize", "h.finitialize(-65)")
 #h.xbutton("run", "h.run()")
-h.xbutton("test", (buttontest, ("hallo", "goodbye")))
+#h.xbutton("test", (buttontest, ("hallo", "goodbye")))
+h.xvarlabel(my_str)
 #g = h.Graph()
 #g.addvar("v", "seg.v")
 h.xpanel()

@@ -13,6 +13,7 @@ import time
 import json
 import copy
 import webbrowser
+import warnings
 from weakref import WeakValueDictionary
 from neuron import h, nrn_dll_sym
 from neuron.units import ms, mV
@@ -882,21 +883,18 @@ def _py_function_handler(browser_id, function):
     # first check user mappings then shared_locals for the function
     reset_cursor = True
     endpos = current_shell.GetTextLength()
-    logging.debug("endpos: "+str(endpos))
     oldpos = current_shell.GetCurrentPos()
     if oldpos == endpos:
         reset_cursor = False
     if reset_cursor:
         current_shell.SetCurrentPos(endpos)
     old_command = current_shell.getCommand()
-    logging.debug("old_command: "+old_command)
     current_shell.clearCommand()
     #current_shell.write('\n')
 
     #exec(function, shared_locals, this_browser.user_mappings)
     this_browser.user_mappings[function]()
 
-    logging.debug(str(current_shell.GetCurrentPos())+' '+str(endpos)+' '+str(len(old_command)))
     if (current_shell.GetCurrentPos()+len(old_command)) != endpos:
         current_shell.prompt()
     current_shell.write(old_command)
@@ -1065,7 +1063,7 @@ def _update_browser_vars(this_browser, locals_copy):
         _update_shapeplot_menus()
 
     # create dictionary of the changed variables 
-    locals_copy.update(this_browser.browser_sent_vars) # don't resend recently updated
+    locals_copy.update(this_browser.browser_sent_vars) # don't resend recently updated from browser
     this_browser.browser_sent_vars = {}
     changed_vars, deleted_vars = find_changed_vars(this_browser, locals_copy)
     locals_copy.update(changed_vars)
