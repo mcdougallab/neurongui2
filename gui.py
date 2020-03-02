@@ -60,8 +60,6 @@ class XCheckBox(Widget):
         self.state_ref = state_variable
         if isinstance(callback, tuple): 
             arg = callback[1]
-            logging.debug("function: "+str(callback[0]))
-            logging.debug("args: "+str(callback[1]))
             if isinstance(callback[1], tuple):
                 self.callback = lambda: callback[0](*arg)
             else:
@@ -91,8 +89,6 @@ class XStateButton(Widget):
         self.state_ref = state_variable
         if isinstance(callback, tuple): # allow input on callback. Unlikely for statebutton but available.
             arg = callback[1]
-            logging.debug("function: "+str(callback[0]))
-            logging.debug("args: "+str(callback[1]))
             if isinstance(callback[1], tuple):
                 self.callback = lambda: callback[0](*arg)
             else:
@@ -121,8 +117,6 @@ class XButton(Widget):
         self.prompt = prompt
         if isinstance(callback, tuple):
             arg = callback[1]
-            logging.debug("function: "+str(callback[0]))
-            logging.debug("args: "+str(callback[1]))
             if isinstance(callback[1], tuple):
                 self.callback = lambda: callback[0](*arg)
             else:
@@ -156,9 +150,7 @@ class XVarLabel(Widget):
         return {self.uuid: self.strref}
 
     def to_html(self):
-        #TODO make this dynamic text in html.  may need special update handling from changing the strref
-        warnings.warn("xvarlabel not yet implemented")
-        return 
+        return """<label class="xvarlabel" data-variable={}> </label>""".format(self.uuid)
 
 
 class Container(Widget):
