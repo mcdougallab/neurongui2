@@ -592,9 +592,9 @@ def _update_shapeplot_menus(*args, **kwargs):
 
 
 def show_run_button(*args):
-    html = '<button data-onclick="run()" style="width:100%; height:100vh; position: absolute; left:0; top:0">Init & Run</button>'
+    html = '<button data-onclick="1" style="width:100%; height:100vh; position: absolute; left:0; top:0">Init & Run</button>'
     return make_browser_html(html,
-        user_mappings={'run': h.run},
+        user_mappings={'1': h.run},
         title='Run Button',
         size=(100, 50))
 
@@ -627,18 +627,18 @@ class RunControl:
             't': h._ref_t,
             'tstop': h._ref_tstop,
             'dt': h._ref_dt,
-            'run': h.run,
-            'init': h.stdinit,
-            'fadvance': h.fadvance,
+            'run()': h.run,
+            'init()': h.stdinit,
+            'fadvance()': h.fadvance,
             'realtime': h._ref_realtime,
-            'stopbutton': self.stop,
-            'do_continue_until': lambda: h.continuerun(self.my_continue_til[0]),
-            'do_continue_for': lambda: h.continuerun(h.t + self.my_continue_for[0])
+            'stopbutton()': self.stop,
+            'do_continue_until()': lambda: h.continuerun(self.my_continue_til[0]),
+            'do_continue_for()': lambda: h.continuerun(h.t + self.my_continue_for[0])
         }
         self._frame = make_browser_html(html,
             user_mappings=user_mappings,
             title='Run Control',
-            size=(300, 280))
+            size=(280, 400))
     
     def stop(self):
         h.stoprun = True
