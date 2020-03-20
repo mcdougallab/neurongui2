@@ -23,6 +23,8 @@ from neuron.gui2.rangevar import rangevars_present
 import neuron
 import ctypes
 from gui_callback import gui_callback
+from guitools import RunControl, ModelView
+import guitools
 
 import logging
 logging.basicConfig(level=logging.DEBUG, filename="mylog.txt")
@@ -272,7 +274,10 @@ class NEURONFrame(wx.Frame):
         self.Bind(wx.EVT_MENU, show_run_button, run_button_menuitem)
         run_control_menuitem = tool_menu.Append(_menu_id(), "Run Control")
         self.Bind(wx.EVT_MENU, show_run_control, run_control_menuitem)
-
+        parcom_menuitem = tool_menu.Append(_menu_id(), "Parallel Computing")
+        self.Bind(wx.EVT_MENU, show_parcom, parcom_menuitem)
+        modelview_menuitem = tool_menu.Append(_menu_id(), "Model View")
+        self.Bind(wx.EVT_MENU, show_modelview, modelview_menuitem)
         menubar = wx.MenuBar()
         menubar.Append(filemenu, "&File")
         menubar.Append(build_menu, "&Build")
@@ -591,6 +596,41 @@ def _update_shapeplot_menus(*args, **kwargs):
 
 
 
+# TODO: remove the need for this
+_parcom = None
+
+def _parcom_refresh(self):
+    _parcom.howmany()
+    _parcom.totalcx()
+    _parcom.ldbal()
+
+def show_parcom(event):
+    global _parcom
+    print('loading ' + os.path.join(base_path, 'hocfiles', 'parcom.hoc'))
+    h.load_file(os.path.join(base_path, 'hocfiles', 'parcom.hoc'))
+    if _parcom is None:
+        _parcom = h.ParallelComputeTool()
+    html = '''
+        <label class="xvarlabel" data-variable='nprocstr'> </label><br/>
+        <label class="xvarlabel" data-variable='cxtotalstr'> </label><br/>
+        <label class="xvarlabel" data-variable='npiecestr'> </label><br/>
+        <label class="xvarlabel" data-variable='ldbalstr'> </label><br/>
+        <button data-onclick="refresh">Refresh</button>
+    '''
+    user_mappings = {
+        'nprocstr': _parcom._ref_nprocstr,
+        'cxtotalstr': _parcom._ref_cxtotalstr,
+        'npiecestr': _parcom._ref_npiecestr,
+        'ldbalstr': _parcom._ref_ldbalstr,
+        'refresh': _parcom_refresh
+    }
+    return make_browser_html(html,
+        user_mappings=user_mappings,
+        title='Parallel Compute Tool',
+        size=(400, 400))
+
+
+
 def show_run_button(*args):
     html = '<button data-onclick="1" style="width:100%; height:100vh; position: absolute; left:0; top:0">Init & Run</button>'
     return make_browser_html(html,
@@ -601,49 +641,8 @@ def show_run_button(*args):
 def show_run_control(event):
     return RunControl()
 
-
-class RunControl:
-    def __init__(self):
-        html = """
-        <table style="width:100%">
-            <tr><td><button data-onclick="init()">Init (mV)</button></td><td><input type="number" data-variable="v_init"></input></tr>
-            <tr><td><button data-onclick="run()">Init & run</button></td></tr>
-            <tr><td><button data-onclick="stopbutton()">Stop</button></td></tr>
-            <tr><td><button data-onclick="do_continue_until()">Continue until (ms)</button></td><td><input type="number" data-variable="continue_til"></input></tr>
-            <tr><td><button data-onclick="do_continue_for()">Continue for (ms)</button></td><td><input type="number" data-variable="continue_for"></input></tr>
-            <tr><td><button data-onclick="fadvance()">Single Step</button></td></tr>
-            <tr><td>t (ms)</td><td><input type="number" data-variable="t"></input></tr>
-            <tr><td>tstop (ms)</td><td><input type="number" data-variable="tstop"></input></tr>
-            <tr><td>dt (ms)</td><td><input type="number" data-variable="dt"></input></tr>
-            <tr><td>Real Time (s)</td><td><input type="number" data-variable="realtime" disabled></input></tr>
-        </table>
-        """
-        self.my_continue_til = h.ref(5)
-        self.my_continue_for = h.ref(1)
-        user_mappings = {
-            'v_init': h._ref_v_init,
-            'continue_til': self.my_continue_til,
-            'continue_for': self.my_continue_for,
-            't': h._ref_t,
-            'tstop': h._ref_tstop,
-            'dt': h._ref_dt,
-            'run()': h.run,
-            'init()': h.stdinit,
-            'fadvance()': h.fadvance,
-            'realtime': h._ref_realtime,
-            'stopbutton()': self.stop,
-            'do_continue_until()': lambda: h.continuerun(self.my_continue_til[0]),
-            'do_continue_for()': lambda: h.continuerun(h.t + self.my_continue_for[0])
-        }
-        self._frame = make_browser_html(html,
-            user_mappings=user_mappings,
-            title='Run Control',
-            size=(280, 400))
-    
-    def stop(self):
-        h.stoprun = True
-
-
+def show_modelview(event):
+    return ModelView()
 class RxDBuilder:
     def __init__(self):
         self._active_regions = []
@@ -839,6 +838,9 @@ def make_browser_html(html, user_mappings={}, title='', size=(600, 400), custom_
     frame.Show()
     _all_windows.append(frame)
     return frame
+
+# TODO: can we avoid the need to do this?
+guitools.make_browser_html = make_browser_html
 
 def make_browser(html_file, user_mappings={}):
     global browser_created_count
