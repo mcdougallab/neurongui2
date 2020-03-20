@@ -599,14 +599,13 @@ def _update_shapeplot_menus(*args, **kwargs):
 # TODO: remove the need for this
 _parcom = None
 
-def _parcom_refresh(self):
+def _parcom_refresh():
     _parcom.howmany()
     _parcom.totalcx()
     _parcom.ldbal()
 
 def show_parcom(event):
     global _parcom
-    print('loading ' + os.path.join(base_path, 'hocfiles', 'parcom.hoc'))
     h.load_file(os.path.join(base_path, 'hocfiles', 'parcom.hoc'))
     if _parcom is None:
         _parcom = h.ParallelComputeTool()

@@ -18,7 +18,7 @@ endtemplate ParallelComputeToolSplitInfo
 
 begintemplate ParallelComputeTool
 public nthread, pthread, cache, busywait, multisplit, pinfo
-public pct, box, map, np, save, nthread_, lb, printpart, move2part
+public pct, box, np, save, nthread_, lb, printpart, move2part
 public showshape
 public nprocstr, cxtotalstr, npiecestr, ldbalstr, change_nthread, nthread_, ispar_
 public cacheffic_, cacheeffic, busywait_, busywait, multisplit_, multisplit
@@ -44,36 +44,6 @@ proc init() {
 	totalcx()
 	ldbal()
 
-	build()
-}
-proc build() {
-	box = new VBox()
-	box.intercept(1)
-	box.ref(this)
-	box.save("save()")
-	xpanel("")
-	xvarlabel(nprocstr)
-	xvarlabel(cxtotalstr)
-	xvarlabel(npiecestr)
-	xvarlabel(ldbalstr)
-	xpvalue("# threads", &nthread_, 1, "change_nthread(nthread_, ispar_)")
-	xcheckbox("Thread Parallel", &ispar_, "change_nthread(nthread_, ispar_)")
-	xcheckbox("Cache Efficient", &cacheeffic_, "cacheeffic(cacheeffic_)")
-	xcheckbox("Use busy waiting", &busywait_, "busywait(busywait_)")
-	xcheckbox("Multisplit", &multisplit_, "multisplit(multisplit_)")
-	xbutton("Refresh", "howmany() totalcx() ldbal()")
-	xpanel()
-	box.intercept(0)
-}
-
-proc map() {
-	if (box.ismapped) return
-	sprint(tstr, "%s", this)
-	if (numarg() > 1) {
-		box.map(tstr, $2, $3, $4, $5)
-	}else{
-		box.map(tstr)
-	}
 }
 proc save() {
 	box.save("load_file(\"parcom.hoc\", \"ParallelComputeTool\")\n}")
