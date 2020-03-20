@@ -838,6 +838,8 @@ def make_browser_html(html, user_mappings={}, title='', size=(600, 400), custom_
     _all_windows.append(frame)
     return frame
 
+neuron.window = make_browser_html
+
 # TODO: can we avoid the need to do this?
 guitools.make_browser_html = make_browser_html
 
