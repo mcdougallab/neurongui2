@@ -604,6 +604,7 @@ def _parcom_refresh():
     _parcom.totalcx()
     _parcom.ldbal()
 
+# TODO: does data-onenter work?
 def show_parcom(event):
     global _parcom
     h.load_file(os.path.join(base_path, 'hocfiles', 'parcom.hoc'))
@@ -613,7 +614,12 @@ def show_parcom(event):
         <label class="xvarlabel" data-variable='nprocstr'> </label><br/>
         <label class="xvarlabel" data-variable='cxtotalstr'> </label><br/>
         <label class="xvarlabel" data-variable='npiecestr'> </label><br/>
-        <label class="xvarlabel" data-variable='ldbalstr'> </label><br/>
+        <label class="xvarlabel" data-variable='ldbalstr'> </label><br/> 
+        # threads: <input type="number" data-variable="nthread" data-onenter="change_nthread"><br/> 
+        <label class="checkbox"><input type="checkbox" data-variable="ispar_" data-onclick="change_nthread"> Thread Parallel</label><br/> 
+        <label class="checkbox"><input type="checkbox" data-variable="cacheeffic_" data-onclick="cacheeffic"> Cache Efficient</label><br/> 
+        <label class="checkbox"><input type="checkbox" data-variable="busywait_" data-onclick="busywait"> Cache Efficient</label><br/>
+        <label class="checkbox"><input type="checkbox" data-variable="multisplit_" data-onclick="multisplit"> Multisplit</label><br/>
         <button data-onclick="refresh">Refresh</button>
     '''
     user_mappings = {
@@ -621,12 +627,21 @@ def show_parcom(event):
         'cxtotalstr': _parcom._ref_cxtotalstr,
         'npiecestr': _parcom._ref_npiecestr,
         'ldbalstr': _parcom._ref_ldbalstr,
-        'refresh': _parcom_refresh
+        'refresh': _parcom_refresh,
+        'ispar_': _parcom._ref_ispar_,
+        'nthread': _parcom._ref_nthread_,
+        'cacheeffic_': _parcom._ref_cacheeffic_,
+        'busywait_': _parcom._ref_busywait_,
+        'multisplit_': _parcom._ref_multisplit_,
+        'change_nthread': lambda: _parcom.change_nthread(_parcom.nthread_, _parcom.ispar_),
+        'cacheeffic': lambda: _parcom.cacheeffic(_parcom.cacheeffic_),
+        'busywait': lambda: _parcom.busywait(_parcom.busywait_),
+        'multisplit': lambda: _parcom.multisplit(_parcom.multisplit_)
     }
     return make_browser_html(html,
         user_mappings=user_mappings,
         title='Parallel Compute Tool',
-        size=(400, 400))
+        size=(250, 280))
 
 
 
