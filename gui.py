@@ -232,7 +232,7 @@ active_container = []
 active_window = None
 
 
-def xpanel(*args):
+def xpanel(*args, context=None):
     global active_window
     if args and active_window is not None:
         raise Exception('not currently allowing nesting xpanels')
@@ -248,22 +248,22 @@ def xpanel(*args):
         active_window = None
 
 
-def xvalue(prompt, variable, boolean_deflt=None, action=None, boolean_canrun=None):
+def xvalue(prompt, variable, boolean_deflt=None, action=None, boolean_canrun=None, context=None):
     active_container[-1].add(XValue(prompt, variable, boolean_deflt, action, boolean_canrun))
 
-def xcheckbox(prompt, state_variable, callback=None):
+def xcheckbox(prompt, state_variable, callback=None, context=None):
     active_container[-1].add(XCheckBox(prompt, state_variable, callback))
 
-def xstatebutton(prompt, state_variable, callback=None):
+def xstatebutton(prompt, state_variable, callback=None, context=None):
     active_container[-1].add(XStateButton(prompt, state_variable, callback))
 
-def xlabel(text):
+def xlabel(text, context=None):
     active_container[-1].add(XLabel(text))
 
-def xbutton(prompt, callback):
+def xbutton(prompt, callback, context=None):
     active_container[-1].add(XButton(prompt, callback))
 
-def xvarlabel(strref):
+def xvarlabel(strref, context=None):
     active_container[-1].add(XVarLabel(strref))
 
 class Graph(Widget): #TODO

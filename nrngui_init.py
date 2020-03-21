@@ -911,7 +911,13 @@ def _py_function_handler(browser_id, function):
     #current_shell.write('\n')
 
     #exec(function, shared_locals, this_browser.user_mappings)
-    this_browser.user_mappings[function]()
+    my_fn = this_browser.user_mappings[function]
+    if isinstance(my_fn, str):
+        # TODO: need to make this work when there's a context
+        #       or, better, just turn strings into functions with context at creation
+        h(my_fn)
+    else:
+        my_fn()
 
     if (current_shell.GetCurrentPos()+len(old_command)) != endpos:
         current_shell.prompt()

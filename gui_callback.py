@@ -39,12 +39,13 @@ def gui_callback(*args):
     all_args = args
     fn = args[0]
     obj = args[1]
-    params = args[2:]
+    context = args[2]
+    params = args[3:]
     #logging.debug("fn: %s", fn)
     #logging.debug("obj: %r", obj)
     #logging.debug("params: %r", params)
     if fn in fn_map:
-        fn_map[fn](*params)
+        fn_map[fn](*params, context=context)
         return True
     elif fn == 'List.browser':
         return list_browser(obj)
