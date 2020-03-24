@@ -11,6 +11,12 @@
         <script>DECLARE_THREE_JS_HERE</script>
         <script>DECLARE_PLOTSHAPE_CODE</script>
         <style>/*STYLESHEET_HERE*/</style>
+        <script>
+            function _update_html(selector, content) {
+                // TODO: should probably allow this to have data- attributes and make those work
+                $(selector).html(content);
+            }
+        </script>
     </head>
 <body>
 

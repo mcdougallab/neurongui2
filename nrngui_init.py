@@ -423,6 +423,9 @@ class NEURONWindow(NEURONFrame):
         """Use this to setup a connection between javascript in the window and Python"""
         self.bindings.SetFunction(name, f)
         self.browser.SetJavascriptBindings(self.bindings)
+    
+    def update_html(self, selector, html):
+        self.browser.ExecuteFunction("_update_html", selector, html)
 
     def set_browser_callbacks(self):
         self.register_binding("_update_vars", _update_vars)
@@ -460,7 +463,8 @@ class NEURONWindow(NEURONFrame):
 
         if MAC:
             # On Mac things work differently, other steps are required
-            self.monitor_loop.running = False
+            if hasattr(self, 'monitor_loop'):
+                self.monitor_loop.running = False
             self.browser.CloseBrowser()
             self.clear_browser_references()
             self.Destroy()
@@ -478,7 +482,9 @@ class NEURONWindow(NEURONFrame):
             # Calling browser.CloseBrowser() and/or self.Destroy()
             # in OnClose may cause app crash on some paltforms in
             # some use cases, details in Issue #107.
-            self.monitor_loop.running = False
+            if hasattr(self, 'monitor_loop'):
+                self.monitor_loop.running = False
+
             self.browser.ParentWindowWillClose()
             event.Skip()
             self.clear_browser_references()
