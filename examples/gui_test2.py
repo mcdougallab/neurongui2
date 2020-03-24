@@ -11,7 +11,7 @@ ic.amp = 40  # since by default a very large section
 ic.delay = 1
 ic.dur = 1
 
-#is_checked = h.ref(0)
+is_checked_ref = h.ref(0)
 class Ref():
     def __init__(self, checked):
         self.checked = checked
@@ -26,11 +26,11 @@ def onpress():
     return
 
 def onpress2():
-    """print("state changed!")
+    print("state changed!")
     if isinstance(is_checked2, Ref):
         print("value: ", is_checked2.checked)
     else:
-        print("value: ", is_checked2[0])"""
+        print("value: ", is_checked2[0])
     return
 
 def buttontest(thing1, thing2):
@@ -42,15 +42,26 @@ def buttontest(thing1, thing2):
 is_checked2 = h.ref(0)
 my_str = h.ref('yay!')
 
+h("""
+proc onpress() {
+    print "The HOC onpress function was called"
+}
+""")
+
+
 h.xpanel("Hello world")
 h.xlabel("Here is some text")
 h.xvalue("h.t", "t")
-#h.xcheckbox("a checkbox", is_checked, "onpress()")
-#h.xcheckbox("a checkbox", (is_checked, 'checked'), onpress)
-#h.xstatebutton("Toggle", is_checked2, onpress2)
+h.xcheckbox("a checkbox", is_checked_ref, "onpress()")
+h.xcheckbox("a checkbox", (is_checked, 'checked'), onpress)
+h.xstatebutton("Toggle", is_checked2, onpress2)
+hb = h.HBox()
+hb.intercept(True)
 h.xbutton("finitialize", "finitialize(-65)")
 h.xbutton("run", "run()")
-#h.xbutton("test", (buttontest, ("hallo", "goodbye")))
+h.xbutton("test", (buttontest, ("hallo", "goodbye")))
+hb.intercept(False)
+hb.map()
 h.xvarlabel(my_str)
 #g = h.Graph()
 #g.addvar("v", "seg.v")
