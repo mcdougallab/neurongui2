@@ -22,8 +22,8 @@ vbox.intercept(True)
 
 h.xlabel("Here is some text")
 h.xvalue("h.t", "t")
-h.xbutton("finitialize", "h.finitialize(-65)")
-h.xbutton("run", "h.run()")
+h.xbutton("finitialize", "finitialize(-65)")
+h.xbutton("run", "run()")
 h.xstatebutton("State", is_checked)
 
 vbox.intercept(False)
