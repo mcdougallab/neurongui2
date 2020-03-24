@@ -45,8 +45,7 @@ def gui_callback(*args):
     #logging.debug("obj: %r", obj)
     #logging.debug("params: %r", params)
     if fn in fn_map:
-        fn_map[fn](*params, context=context)
-        return True
+        return fn_map[fn](*params, context=context)
     elif fn == 'List.browser':
         return list_browser(obj)
     elif fn == 'boolean_dialog':

@@ -246,25 +246,32 @@ def xpanel(*args, context=None):
         #logging.debug(str(active_window.mappings()))
         make_browser_html(html, user_mappings=active_window.mappings(), title=active_window.title)
         active_window = None
+    return 0
 
 
 def xvalue(prompt, variable, boolean_deflt=None, action=None, boolean_canrun=None, context=None):
     active_container[-1].add(XValue(prompt, variable, boolean_deflt, action, boolean_canrun))
+    return 0
 
 def xcheckbox(prompt, state_variable, callback=None, context=None):
     active_container[-1].add(XCheckBox(prompt, state_variable, callback))
+    return 0
 
 def xstatebutton(prompt, state_variable, callback=None, context=None):
     active_container[-1].add(XStateButton(prompt, state_variable, callback))
+    return 0
 
 def xlabel(text, context=None):
     active_container[-1].add(XLabel(text))
+    return 0
 
 def xbutton(prompt, callback, context=None):
     active_container[-1].add(XButton(prompt, callback))
+    return 0
 
 def xvarlabel(strref, context=None):
     active_container[-1].add(XVarLabel(strref))
+    return 0
 
 class Graph(Widget): #TODO
     def __init__(self):
