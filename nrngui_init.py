@@ -382,6 +382,9 @@ class NEURONWindow(NEURONFrame):
             self.embed_browser()
             self.Show()
 
+        self.bindings = cef.JavascriptBindings(bindToFrames=True, bindToPopups=True)
+
+
     def setup_icon(self):
         # TODO: remove this if we have a real icon
         return
@@ -422,7 +425,6 @@ class NEURONWindow(NEURONFrame):
         self.browser.SetJavascriptBindings(self.bindings)
 
     def set_browser_callbacks(self):
-        self.bindings = cef.JavascriptBindings(bindToFrames=True, bindToPopups=True)
         self.register_binding("_update_vars", _update_vars)
         self.register_binding("_py_function_handler", _py_function_handler)
         self.register_binding("_set_relevant_vars", _set_relevant_vars)
