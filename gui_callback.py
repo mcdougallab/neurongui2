@@ -102,7 +102,6 @@ def gui_callback(*args):
         print('0:', params[2])
         print('1:', params[1])
         return float(input('your choice: '))
-    print('do something else')
     return 1
 
 """
