@@ -4,30 +4,76 @@ from neuron import h
 # NOTE: must make make_browser_html available in this namespace 
 #
 
+def _mv_item_to_html(item):
+    children = item.children
+    if children is None:
+        children = []
+    if not item.name.strip() and not children:
+        result = '</ul><ul>'
+    else:
+        result = '<li>' + item.name
+        if children:
+            result += '\n<ul>'
+            for child in children:
+                result += _mv_item_to_html(child)
+            result += '</ul>\n'
+        result += '</li>\n'
+    return result
+
+def load_file(filename):
+    import os
+    h.load_file(os.path.join(h.neuronhome(), 'lib', 'hoc', filename))
+
 class ModelView:
-    def __init__(self, dontdisplay=0):
+    def __init__(self, display=True):
         """Construct the ModelView object.
         
         Data is as-is at the time of creation; it is not updated dynamically.
 
-        pass in dontdisplay=1 to not display
+        pass in display=False to not display
         """
-        self._gather_data()
-        if not dontdisplay:
+        # TODO: note that this may cause problems if the libraries are already loaded somehow
+        #       in a way that didn't specify the full path as templates cannot be redefined in 
+        #       HOC
+
+        # start by loading the libraries
+        h('objref nil')
+        h('begintemplate ModelViewGUI\nendtemplate ModelViewGUI')
+        h('begintemplate ModelViewXML\nendtemplate ModelViewXML')
+        # this next one will be a problem whenever there is a KSChan
+        h('begintemplate KSTransHelper\nendtemplate KSTransHelper')
+        h.load_file('stdlib.hoc')
+        load_file('mview/parmsets.hoc')
+        load_file('mview/treeview.hoc')
+        load_file('mview/parmvals.hoc')
+        load_file('mview/secanal.hoc')
+        load_file('mview/ppanal.hoc')
+        load_file('mview/distinct.hoc')
+        load_file('mview/realcell.hoc')
+        load_file('mview/artview.hoc')
+        load_file('mview/ncview.hoc')
+        load_file('mview/allcell.hoc')
+        load_file('mview/allpp.hoc')
+        load_file('mview/rcclasses.hoc')
+        load_file('mview/mview1.hoc')
+
+        self.mview = h.ModelView(0)
+        self.tree = self.mview.display
+
+        if display:
             self._display()
     
-    def _gather_data(self):
-        seg_count = [sec.nseg for sec in h.allsec()]
-        self.nsec = len(seg_count)
-        self.nseg = sum(seg_count)
-        self.celsius = h.celsius
-    
+    def _to_html(self):
+        result = '<ul>'
+        for item in self.tree.top:
+            result += _mv_item_to_html(item)
+        return result + '</ul>'
+
     def _display(self):
-        html = '''{self.nsec} sections; {self.nseg} segments<br/>{self.celsius} degrees C'''.format(self=self)
-        return make_browser_html(html,
+        return make_browser_html(self._to_html(),
             user_mappings={},
             title='ModelView',
-            size=(300, 300))        
+            size=(600, 600))        
 
 class RunControl:
     def __init__(self):
