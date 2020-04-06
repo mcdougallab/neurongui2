@@ -188,11 +188,13 @@ class HBox(Container):
     def intercept(self, value):
         if value:
             active_container.append(self)
+            return 1
         elif active_container[-1] != self and not value:
             # do nothing
             pass
         else:
             active_container.pop()
+            return 1
     
     def map(self):
         if not active_container:
@@ -202,6 +204,7 @@ class HBox(Container):
             raise Exception('can only map to different container')
 
         active_container[-1].add(self)
+        return 1
 
 
 class VBox(Container):
@@ -212,11 +215,13 @@ class VBox(Container):
     def intercept(self, value):
         if value:
             active_container.append(self)
+            return 1
         elif active_container[-1] != self and not value:
             # do nothing
             pass
         else:
             active_container.pop()
+            return 1
     
     def map(self):
         if not active_container:
@@ -226,6 +231,7 @@ class VBox(Container):
             raise Exception('can only map to different container')
 
         active_container[-1].add(self)
+        return 1
 
 active_container = []
 
@@ -273,16 +279,31 @@ def xvarlabel(strref, context=None):
     active_container[-1].add(XVarLabel(strref))
     return 0
 
-class Graph(Widget): #TODO
+class Graph(Widget):
     def __init__(self):
-        self.label = []
-        self.varname = []
+        self.labels = {}
+        self.vars = []\
+        #self.var_mappings = {}
         active_container[-1].add(self)
 
-    def addvar(self, label, varname):
-        self.label.append(label)
-        self.varname.append(varname)
+    def __repr__(self):
+        return 'Graph'
+
+    def mappings(self):
+        return {}
+
+    def addvar(self, label, var):
+        #current_uuid = uuid.uuid4().hex
+        #self.var_mappings.update({current_uuid: var}) 
+        self.vars.append(var)
+        self.labels.update({var: label})
+        logging.debug("added graph var: "+label)
+        return 1
 
     def to_html(self):
-        return """<div class="lineplot" data-x-var="h.t" data-y-var="{}" data-xlab="time (ms)" data-legendlabs="{}" style="width:300px; height:300px; border: 1px black solid"></div>""".format(";".join(self.varname), ";".join(self.label))
-
+        #if not self.var_mappings:
+        if not self.vars:
+            return '<div class="lineplot"></div>'
+        else:
+            #return """<div class="lineplot" data-x-var="h.t" data-y-var="{}" data-xlab="time (ms)" data-legendlabs="{}"></div>""".format(";".join(self.var_mappings.keys()), ";".join(self.labels.values()))
+            return """<div class="lineplot" data-x-var="h.t" data-y-var="{}" data-xlab="time (ms)" data-legendlabs="{}" data-ylim="-70;20"></div>""".format(";".join(self.vars), ";".join(self.labels.values()))
