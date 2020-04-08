@@ -12,10 +12,32 @@ class Box:
         return self.mapped
     def map(self, *args):
         self.mapped = True
-        return True
+        return 1
     def unmap(self, *args):
         self.mapped = False
-        return True
+        return 1
+
+class graphProto:
+    def __init__(self, *args):
+        self.expressions = []
+        self.mode = 0
+    def __repr__(self):
+        return 'GraphProto'
+    def addexpr(self, expr):
+        self.expressions.append(expr)
+        print(self.expressions)
+        return 1
+    def plot(self, *args):
+        for e in self.expressions:
+            print(e+"\n")
+        return 1
+    def __del__(self):
+        print("goodbye Graph")
+
+def graphmode(mode):
+    print('obsolete graphmode')
+    print(mode)
+    return 0
 
 class TextEditor:
     def __init__(self, param):
@@ -48,9 +70,9 @@ def graphmode(mode):
 def list_browser(the_list):
     print('list_browser:')
     print(the_list)
-    for i in range(len(the_list)):
-        print(the_list.o(i))
-    return True
+    #for i in range(len(the_list)):
+        #print(the_list.o(i))
+    return 1
 
 fn_map = {
     'xpanel': xpanel,
