@@ -15,8 +15,11 @@ ic.dur = 1
 h.xpanel("neuron")
 h.xlabel("voltage graph")
 g = h.Graph()
-g.addvar("v", "seg.v")
-g.addvar("m", "seg.hh.m")
+g.addvar("v", "v(0.5)")   #hoc string example
+g.addvar("m", seg.hh._ref_m)   #pointer example
+#g.addvar("v", soma(0.5)._ref_v) #pointer
+#g.addvar("v(0.5)")   #no label (not yet)
+
 h.xpanel()
 
 h.finitialize(-65)

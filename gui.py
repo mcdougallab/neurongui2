@@ -249,7 +249,7 @@ def xpanel(*args, context=None):
         active_container.append(active_window)
     else:
         html = active_window.to_html()
-        #logging.debug(str(active_window.mappings()))
+        logging.debug("mappings: "+str(active_window.mappings()))
         make_browser_html(html, user_mappings=active_window.mappings(), title=active_window.title)
         active_window = None
     return 0
@@ -282,28 +282,30 @@ def xvarlabel(strref, context=None):
 class Graph(Widget):
     def __init__(self):
         self.labels = {}
-        self.vars = []\
-        #self.var_mappings = {}
+        self.var_mappings = {}
         active_container[-1].add(self)
 
     def __repr__(self):
         return 'Graph'
 
     def mappings(self):
-        return {}
+        return self.var_mappings
 
     def addvar(self, label, var):
-        #current_uuid = uuid.uuid4().hex
-        #self.var_mappings.update({current_uuid: var}) 
-        self.vars.append(var)
-        self.labels.update({var: label})
+        current_uuid = uuid.uuid4().hex
+        if (isinstance(var, str)):  #retrieve cas
+            spl = var.split('(')
+            seg = float(spl[1][:-1])
+            ptr = getattr(h.cas()(seg), "_ref_" + spl[0])
+            self.var_mappings.update({current_uuid: ptr}) 
+        else:   #TODO: if not a ptr
+            self.var_mappings.update({current_uuid: var})
+        self.labels.update({current_uuid: label})
         logging.debug("added graph var: "+label)
         return 1
 
     def to_html(self):
-        #if not self.var_mappings:
-        if not self.vars:
+        if not self.var_mappings:
             return '<div class="lineplot"></div>'
         else:
-            #return """<div class="lineplot" data-x-var="h.t" data-y-var="{}" data-xlab="time (ms)" data-legendlabs="{}"></div>""".format(";".join(self.var_mappings.keys()), ";".join(self.labels.values()))
-            return """<div class="lineplot" data-x-var="h.t" data-y-var="{}" data-xlab="time (ms)" data-legendlabs="{}" data-ylim="-70;20"></div>""".format(";".join(self.vars), ";".join(self.labels.values()))
+            return """<div class="lineplot" data-x-var="h.t" data-y-var="{}" data-xlab="time (ms)" data-legendlabs="{}" data-ylim="-70;20"></div>""".format(";".join(self.var_mappings.keys()), ";".join(self.labels.values()))

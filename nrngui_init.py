@@ -992,28 +992,47 @@ def lookup(this_browser, variable, action, newValue=None):
             return None
 
 def lookup_graph_var(this_browser, variable):
-    # specifically for graph vector variables; only to retrieve
-    # _ref_ attributes
+    # specifically for graph vector variables
     # handles layered attributes if first key is available to retrieve
     mappings = this_browser.user_mappings
-    split_var = variable.split('.')
-    key = split_var[0]
-    attributes = split_var[1:]
-    if key in mappings.keys():
-        obj = mappings[key]
-    elif key in shared_locals.keys():
-        obj = shared_locals[key]
+
+    if variable in mappings.keys():
+        result = mappings[variable]
+    elif variable in shared_locals.keys():
+        result = shared_locals[variable]
     else:
-        print("unknown variable: ", variable)
+        split_var = variable.split('.') #try string
+        key = split_var[0]
+        if len(split_var) > 1:
+            if key in mappings.keys():
+                obj = mappings[key]
+            elif key in shared_locals.keys():
+                obj = shared_locals[key]
+            else:
+                print("unknown variable: ", key)
+                current_shell.prompt()
+                return None
+            
+            attributes = split_var[1:]
+            i_attr = 0
+            len_attr = len(attributes)
+            while i_attr < (len_attr - 1):
+                obj = getattr(obj, attributes[i_attr])
+                i_attr += 1
+            return getattr(obj, "_ref_"+attributes[i_attr])
+        else:
+            print("not a graph variable: ", variable)
+            current_shell.prompt()
+            return None
+
+    if isinstance(result, HocObject):
+        print("found a pointer")
+        print(result)
+        return result
+    else:
+        print("not a pointer: ", variable)
         current_shell.prompt()
         return None
-
-    i_attr = 0
-    len_attr = len(attributes)
-    while i_attr < (len_attr - 1):
-        obj = getattr(obj, attributes[i_attr])
-        i_attr += 1
-    return getattr(obj, "_ref_"+attributes[i_attr])
 
 def _update_vars(browser_id, variable, value):
     global browser_weakvaldict
