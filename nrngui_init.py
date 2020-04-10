@@ -920,12 +920,7 @@ def _py_function_handler(browser_id, function):
 
     #exec(function, shared_locals, this_browser.user_mappings)
     my_fn = this_browser.user_mappings[function]
-    if isinstance(my_fn, str):
-        # TODO: need to make this work when there's a context
-        #       or, better, just turn strings into functions with context at creation
-        h(my_fn)
-    else:
-        my_fn()
+    my_fn()     #callable
 
     if (current_shell.GetCurrentPos()+len(old_command)) != endpos:
         current_shell.prompt()
@@ -1026,8 +1021,6 @@ def lookup_graph_var(this_browser, variable):
             return None
 
     if isinstance(result, HocObject):
-        print("found a pointer")
-        print(result)
         return result
     else:
         print("not a pointer: ", variable)
