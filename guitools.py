@@ -24,6 +24,27 @@ def load_file(filename):
     import os
     h.load_file(os.path.join(h.neuronhome(), 'lib', 'hoc', filename))
 
+def run_in_context(command, context):
+    if context is None:
+        h(command)
+    else:
+        h('objref context_')
+        h.context_ = context
+        h(f"{{object_push(context_)}}\n {command}\n {{object_pop()}}")
+        h.context_ = None
+
+def make_callable(callback, context):
+    if isinstance(callback, str):
+        return lambda: run_in_context(callback, context)
+    if isinstance(callback, tuple):
+        arg = callback[1]
+        if isinstance(callback[1], tuple):
+            return lambda: callback[0](*arg)
+        else:
+            return lambda: callback[0](arg)
+    else:
+        return callback
+
 class ModelView:
     def __init__(self, display=True):
         """Construct the ModelView object.

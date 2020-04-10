@@ -1,6 +1,7 @@
 import uuid
 from neuron import h
 import warnings
+from guitools import make_callable
 
 import logging
 logging.basicConfig(level=logging.DEBUG, filename="mylog.txt")
@@ -15,7 +16,7 @@ class Widget:
 
 
 class XValue(Widget):
-    def __init__(self, prompt, variable, boolean_deflt, action, boolean_canrun):
+    def __init__(self, prompt, variable, boolean_deflt, action, boolean_canrun, context):
         self.prompt = prompt
         if (isinstance(variable, str)):
             self.ptr = getattr(h, "_ref_" + variable)
@@ -30,14 +31,7 @@ class XValue(Widget):
         self.callback = None
         if action is not None:
             self.uuid2 = uuid.uuid4().hex
-            if isinstance(callback, tuple): 
-                arg = callback[1]
-                if isinstance(callback[1], tuple):
-                    self.callback = lambda: callback[0](*arg)
-                else:
-                    self.callback = lambda: callback[0](arg)
-            else:
-                self.callback = callback
+            self.callback = make_callable(callback, context)
         if boolean_canrun:
             # TODO change the label to a button, callback when either button is pressed or value is changed
             warnings.warn("Xvalue callback button appearances not yet implemented.")
@@ -55,17 +49,10 @@ class XValue(Widget):
             return """<input type="number" data-variable="{}"><label> {}</label>""".format(self.uuid, self.prompt)
 
 class XCheckBox(Widget):
-    def __init__(self, prompt, state_variable, callback):
+    def __init__(self, prompt, state_variable, callback, context):
         self.prompt = prompt
         self.state_ref = state_variable
-        if isinstance(callback, tuple): 
-            arg = callback[1]
-            if isinstance(callback[1], tuple):
-                self.callback = lambda: callback[0](*arg)
-            else:
-                self.callback = lambda: callback[0](arg)
-        else:
-            self.callback = callback
+        self.callback = make_callable(callback, context)
 
         self.uuid = uuid.uuid4().hex    
         self.uuid2 = uuid.uuid4().hex
@@ -84,17 +71,10 @@ class XCheckBox(Widget):
 
 
 class XStateButton(Widget):
-    def __init__(self, prompt, state_variable, callback):
+    def __init__(self, prompt, state_variable, callback, context):
         self.prompt = prompt
         self.state_ref = state_variable
-        if isinstance(callback, tuple): # allow input on callback. Unlikely for statebutton but available.
-            arg = callback[1]
-            if isinstance(callback[1], tuple):
-                self.callback = lambda: callback[0](*arg)
-            else:
-                self.callback = lambda: callback[0](arg)
-        else:
-            self.callback = callback
+        self.callback = make_callable(callback, context)
 
         self.uuid = uuid.uuid4().hex   
         self.uuid2 = uuid.uuid4().hex 
@@ -111,18 +91,10 @@ class XStateButton(Widget):
         else:
             return """<button class="state" data-variable="{}">{}</button>""".format(self.uuid, self.prompt)
 
-
 class XButton(Widget): 
-    def __init__(self, prompt, callback):
+    def __init__(self, prompt, callback, context):
         self.prompt = prompt
-        if isinstance(callback, tuple):
-            arg = callback[1]
-            if isinstance(callback[1], tuple):
-                self.callback = lambda: callback[0](*arg)
-            else:
-                self.callback = lambda: callback[0](arg)
-        else:
-            self.callback = callback
+        self.callback = make_callable(callback, context)
         self.uuid = uuid.uuid4().hex
 
     def mappings(self):
@@ -188,11 +160,13 @@ class HBox(Container):
     def intercept(self, value):
         if value:
             active_container.append(self)
+            return 1
         elif active_container[-1] != self and not value:
             # do nothing
             pass
         else:
             active_container.pop()
+            return 1
     
     def map(self):
         if not active_container:
@@ -202,6 +176,7 @@ class HBox(Container):
             raise Exception('can only map to different container')
 
         active_container[-1].add(self)
+        return 1
 
 
 class VBox(Container):
@@ -212,11 +187,13 @@ class VBox(Container):
     def intercept(self, value):
         if value:
             active_container.append(self)
+            return 1
         elif active_container[-1] != self and not value:
             # do nothing
             pass
         else:
             active_container.pop()
+            return 1
     
     def map(self):
         if not active_container:
@@ -226,6 +203,7 @@ class VBox(Container):
             raise Exception('can only map to different container')
 
         active_container[-1].add(self)
+        return 1
 
 active_container = []
 
@@ -243,22 +221,22 @@ def xpanel(*args, context=None):
         active_container.append(active_window)
     else:
         html = active_window.to_html()
-        #logging.debug(str(active_window.mappings()))
+        logging.debug("mappings: "+str(active_window.mappings()))
         make_browser_html(html, user_mappings=active_window.mappings(), title=active_window.title)
         active_window = None
     return 0
 
 
 def xvalue(prompt, variable, boolean_deflt=None, action=None, boolean_canrun=None, context=None):
-    active_container[-1].add(XValue(prompt, variable, boolean_deflt, action, boolean_canrun))
+    active_container[-1].add(XValue(prompt, variable, boolean_deflt, action, boolean_canrun, context))
     return 0
 
 def xcheckbox(prompt, state_variable, callback=None, context=None):
-    active_container[-1].add(XCheckBox(prompt, state_variable, callback))
+    active_container[-1].add(XCheckBox(prompt, state_variable, callback, context))
     return 0
 
 def xstatebutton(prompt, state_variable, callback=None, context=None):
-    active_container[-1].add(XStateButton(prompt, state_variable, callback))
+    active_container[-1].add(XStateButton(prompt, state_variable, callback, context))
     return 0
 
 def xlabel(text, context=None):
@@ -266,23 +244,40 @@ def xlabel(text, context=None):
     return 0
 
 def xbutton(prompt, callback, context=None):
-    active_container[-1].add(XButton(prompt, callback))
+    active_container[-1].add(XButton(prompt, callback, context))
     return 0
 
 def xvarlabel(strref, context=None):
     active_container[-1].add(XVarLabel(strref))
     return 0
 
-class Graph(Widget): #TODO
+class Graph(Widget):
     def __init__(self):
-        self.label = []
-        self.varname = []
+        self.labels = {}
+        self.var_mappings = {}
         active_container[-1].add(self)
 
-    def addvar(self, label, varname):
-        self.label.append(label)
-        self.varname.append(varname)
+    def __repr__(self):
+        return 'Graph'
+
+    def mappings(self):
+        return self.var_mappings
+
+    def addvar(self, label, var):
+        current_uuid = uuid.uuid4().hex
+        if (isinstance(var, str)):  #retrieve cas
+            spl = var.split('(')
+            seg = float(spl[1][:-1])
+            ptr = getattr(h.cas()(seg), "_ref_" + spl[0])
+            self.var_mappings.update({current_uuid: ptr}) 
+        else:   #TODO: if not a ptr
+            self.var_mappings.update({current_uuid: var})
+        self.labels.update({current_uuid: label})
+        logging.debug("added graph var: "+label)
+        return 1
 
     def to_html(self):
-        return """<div class="lineplot" data-x-var="h.t" data-y-var="{}" data-xlab="time (ms)" data-legendlabs="{}" style="width:300px; height:300px; border: 1px black solid"></div>""".format(";".join(self.varname), ";".join(self.label))
-
+        if not self.var_mappings:
+            return '<div class="lineplot"></div>'
+        else:
+            return """<div class="lineplot" data-x-var="h.t" data-y-var="{}" data-xlab="time (ms)" data-legendlabs="{}" data-ylim="-70;20"></div>""".format(";".join(self.var_mappings.keys()), ";".join(self.labels.values()))
