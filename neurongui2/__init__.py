@@ -22,9 +22,9 @@ from neuron.gui2.utilities import _segment_3d_pts
 from neuron.gui2.rangevar import rangevars_present
 import neuron
 import ctypes
-from gui_callback import gui_callback
-from guitools import RunControl, ModelView
-import guitools
+from .gui_callback import gui_callback
+from .guitools import RunControl, ModelView
+from . import guitools
 import atexit
 
 import logging
@@ -825,7 +825,6 @@ def make_terminal(*args, **kwargs):
     current_shell.redirectStdin(True)
     current_shell.redirectStderr(True)
     current_shell.StyleClearAll() #TODO: only do this for printed output?
-    shell.write("\nType setupSim() or quit() or use the menus or use NEURON as usual\n")
     shell.prompt()
     window.Show(True) 
 
@@ -1115,7 +1114,7 @@ def setupSim():
 shared_locals = {'make_browser': make_browser, 'quit': sys.exit, 'weakdict':browser_weakvaldict, 'setupSim':setupSim}
 
 # todo: should this be here or in main
-import gui
+from . import gui
 gui.make_browser_html = make_browser_html
 
 try:
@@ -1143,20 +1142,16 @@ if MAC:
     # This might not be a big deal, given that NEURON is already an app?
 
 def run_file_after_delay(filename):
-    print('run_file_after_delay', filename)
     extension = filename.split('.')[-1]
     if extension == 'py':
         with open(filename) as f:
-            print('reading...')
             code = compile(f.read(), filename, 'exec')
-            print('... read')
         current_shell.interp.runcode(code)
     elif extension in ('hoc', 'ses'):
         # the True means it will always run, even if it has already been run
         h.load_file(True, filename)
     else:
-        print('undefined file:', filename)
-
+        pass
 
 if WINDOWS:
     # noinspection PyUnresolvedReferences, PyArgumentList
@@ -1173,7 +1168,14 @@ if __name__ == '__main__':
         wx.CallLater(1, lambda: run_file_after_delay(filename))
     app.MainLoop()
 else:
-    wx.CallLater(1, lambda: run_file_after_delay(_original_program_name))
+    if _original_program_name:
+        if _original_program_name == '-m':
+            if len(sys.argv) > 1:
+                filename = sys.argv[1]
+                wx.CallLater(1, lambda: run_file_after_delay(filename))
+        else:
+            filename = _original_program_name
+            wx.CallLater(1, lambda: run_file_after_delay(filename))
     app.MainLoop()
 
 @atexit.register

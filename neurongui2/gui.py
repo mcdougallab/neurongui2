@@ -1,7 +1,7 @@
 import uuid
 from neuron import h
 import warnings
-from guitools import make_callable
+from .guitools import make_callable
 
 import logging
 logging.basicConfig(level=logging.DEBUG, filename="mylog.txt")
