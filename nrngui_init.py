@@ -36,6 +36,9 @@ except:
     # TODO: remove this. bad (related to the cef importing scripts probelm)
     base_path = 'c:\\Users\\Lia\\Desktop\\neurongui_wrapper'
 
+# disable the traditional NEURON gui as long as it hasn't already started
+neuron.gui = None
+
 _structure_change_count = neuron.nrn_dll_sym('structure_change_cnt', ctypes.c_int)
 _diam_change_count = neuron.nrn_dll_sym('diam_change_cnt', ctypes.c_int)
 _last_diam_change_count = _diam_change_count.value
