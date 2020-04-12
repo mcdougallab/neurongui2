@@ -25,6 +25,7 @@ import ctypes
 from gui_callback import gui_callback
 from guitools import RunControl, ModelView
 import guitools
+import atexit
 
 import logging
 logging.basicConfig(level=logging.DEBUG, filename="mylog.txt")
@@ -36,8 +37,10 @@ except:
     # TODO: remove this. bad (related to the cef importing scripts probelm)
     base_path = 'c:\\Users\\Lia\\Desktop\\neurongui_wrapper'
 
-# disable the traditional NEURON gui as long as it hasn't already started
+# disable importing traditional NEURON gui as long as it hasn't already started
 neuron.gui = None
+
+_original_program_name = sys.argv[0]
 
 _structure_change_count = neuron.nrn_dll_sym('structure_change_cnt', ctypes.c_int)
 _diam_change_count = neuron.nrn_dll_sym('diam_change_cnt', ctypes.c_int)
@@ -96,36 +99,6 @@ def html_to_data_uri(html, browser_id, js_callback=None):
         js_callback.Call(ret)
     else:
         return ret
-
-def main():
-    check_versions()
-    #sys.excepthook = cef.ExceptHook  # To shutdown all CEF processes on error
-    settings = {}
-    if MAC:
-        # Issue #442 requires enabling message pump on Mac
-        # and calling message loop work in a timer both at
-        # the same time. This is an incorrect approach
-        # and only a temporary fix.
-        settings["external_message_pump"] = True
-
-        # argv[0] is used by default in Mac to populate the program menu
-        # e.g. Hide Neuron, Quit Neuron
-        sys.argv[0] = 'NEURON'
-
-        # TODO: apparently need to create an app to have the mac menubar program name say something other than python
-        # see https://stackoverflow.com/questions/12633100/changing-wxpython-app-mac-menu-bar-title
-        # This might not be a big deal, given that NEURON is already an app?
-
-    if WINDOWS:
-        # noinspection PyUnresolvedReferences, PyArgumentList
-        cef.DpiAware.EnableHighDpiSupport()
-    cef.Initialize(settings=settings)
-    app = CefApp(False)
-    app.MainLoop()
-    del app  # Must destroy before calling Shutdown
-    if not MAC:
-        # On Mac shutdown is called in OnClose
-        cef.Shutdown()
 
 
 def check_versions():
@@ -297,6 +270,7 @@ class NEURONFrame(wx.Frame):
 
 class NEURONWindow(NEURONFrame):
     def __init__(self, html_file=None, user_mappings={}, html=None, title='', size=(600, 400), custom_menus={}):
+        self.bindings = cef.JavascriptBindings(bindToFrames=True, bindToPopups=True)
         self.browser = None
         self.html_file = html_file
         self.user_mappings = user_mappings
@@ -385,7 +359,6 @@ class NEURONWindow(NEURONFrame):
             self.embed_browser()
             self.Show()
 
-        self.bindings = cef.JavascriptBindings(bindToFrames=True, bindToPopups=True)
 
 
     def setup_icon(self):
@@ -1151,5 +1124,62 @@ try:
 except: 
     print("Gui redirect function not found")
 
+check_versions()
+#sys.excepthook = cef.ExceptHook  # To shutdown all CEF processes on error
+settings = {}
+if MAC:
+    # Issue #442 requires enabling message pump on Mac
+    # and calling message loop work in a timer both at
+    # the same time. This is an incorrect approach
+    # and only a temporary fix.
+    settings["external_message_pump"] = True
+
+    # argv[0] is used by default in Mac to populate the program menu
+    # e.g. Hide Neuron, Quit Neuron
+    sys.argv[0] = 'NEURON'
+
+    # TODO: apparently need to create an app to have the mac menubar program name say something other than python
+    # see https://stackoverflow.com/questions/12633100/changing-wxpython-app-mac-menu-bar-title
+    # This might not be a big deal, given that NEURON is already an app?
+
+def run_file_after_delay(filename):
+    print('run_file_after_delay', filename)
+    extension = filename.split('.')[-1]
+    if extension == 'py':
+        with open(filename) as f:
+            print('reading...')
+            code = compile(f.read(), filename, 'exec')
+            print('... read')
+        current_shell.interp.runcode(code)
+    elif extension in ('hoc', 'ses'):
+        # the True means it will always run, even if it has already been run
+        h.load_file(True, filename)
+    else:
+        print('undefined file:', filename)
+
+
+if WINDOWS:
+    # noinspection PyUnresolvedReferences, PyArgumentList
+    cef.DpiAware.EnableHighDpiSupport()
+
+app = CefApp(False)
+cef.Initialize(settings=settings)
+
+
 if __name__ == '__main__':
-    main()
+    if len(sys.argv) > 1:
+        filename = sys.argv[1]
+        sys.argv = sys.argv[1:]
+        wx.CallLater(1, lambda: run_file_after_delay(filename))
+    app.MainLoop()
+else:
+    wx.CallLater(1, lambda: run_file_after_delay(_original_program_name))
+    app.MainLoop()
+
+@atexit.register
+def on_shutdown():
+    global app
+    del app  # Must destroy before calling Shutdown
+    if not MAC:
+        # On Mac shutdown is called in OnClose
+        cef.Shutdown()
