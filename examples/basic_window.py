@@ -1,3 +1,4 @@
+import neurongui2
 from neuron import h, window
 
 html = """
