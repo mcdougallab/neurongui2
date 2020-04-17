@@ -106,12 +106,14 @@ def gui_callback(*args):
     try:
         if not obj:
             if fn in fn_map:
-                return fn_map[fn](*params, context=context)
+                call = fn_map[fn]
+                return call(*params) if context is None else call(*params, context=context)
             elif fn in class_map:
                 return class_map[fn](*params)
         else:
             split = fn.split('.')
-            return getattr(obj, split[1])(*params)
+            call = getattr(obj, split[1])
+            return call(*params) if context is None else call(*params, context=context)
     except:
         warnings.warn("redirection not set up for "+fn)
 
