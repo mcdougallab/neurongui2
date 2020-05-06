@@ -1153,6 +1153,11 @@ def run_file_after_delay(filename):
     else:
         pass
 
+def do_nothing():
+    pass
+
+work_around = h.CVode().extra_scatter_gather(0, do_nothing)
+
 if WINDOWS:
     # noinspection PyUnresolvedReferences, PyArgumentList
     cef.DpiAware.EnableHighDpiSupport()
@@ -1166,16 +1171,6 @@ if __name__ == '__main__':
         filename = sys.argv[1]
         sys.argv = sys.argv[1:]
         wx.CallLater(1, lambda: run_file_after_delay(filename))
-    app.MainLoop()
-else:
-    if _original_program_name:
-        if _original_program_name == '-m':
-            if len(sys.argv) > 1:
-                filename = sys.argv[1]
-                wx.CallLater(1, lambda: run_file_after_delay(filename))
-        else:
-            filename = _original_program_name
-            wx.CallLater(1, lambda: run_file_after_delay(filename))
     app.MainLoop()
 
 @atexit.register
