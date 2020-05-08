@@ -264,7 +264,8 @@ class Graph(Widget):
         return self.var_mappings
 
     def addvar(self, label, var=None):
-        if var == None:
+        default_lab = False
+        if var is None:
             var = label
             default_lab = True
         current_uuid = uuid.uuid4().hex

@@ -18,8 +18,10 @@ function ShapePlot(container) {
 }
 
 ShapePlot.prototype.update = function() {
-    if (this.section_data !== neuron_section_data) {
-        this.section_data = neuron_section_data;
+    if (this.section_data !== neuron_section_data[0]) {
+        this.section_data = neuron_section_data[0];
+        this.camera_dist = neuron_section_data[1]*2.5;
+        this.tc.camera.position.set(0,0,this.camera_dist);
         this.tc.onContainerResize();
         this.tc.clearLines();
         var my_mode = this.container.attr('data-mode');

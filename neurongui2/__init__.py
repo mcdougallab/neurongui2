@@ -10,6 +10,7 @@ import os
 import base64
 import threading
 import time
+import math
 import json
 import copy
 import webbrowser
@@ -382,9 +383,31 @@ class NEURONWindow(NEURONFrame):
         h.define_shape()
         secs = list(h.allsec())
         geo = []
+        xs, ys, zs = [],[],[]
+        max_dist = 0
+        use_centroid = False
+        try:
+            n3d = h.soma.n3d()
+            [x_orig, y_orig, z_orig] = [h.soma.x3d(0), h.soma.y3d(0), h.soma.z3d(0)]
+        except:
+            use_centroid = True
         for sec in secs:
             geo += _segment_3d_pts(sec)
-        self.browser.ExecuteJavascript("set_neuron_section_data(%s);" % json.dumps(geo))
+            n3d = sec.n3d()
+            xs.append(sec.x3d(n3d - 1))
+            ys.append(sec.y3d(n3d - 1))
+            zs.append(sec.z3d(n3d - 1))
+        numpts = len(xs)
+        if use_centroid:
+            if len(secs) <= 2:
+                [x_orig, y_orig, z_orig] = [secs[0].x3d(0), secs[0].y3d(0), secs[0].z3d(0)]
+            else:
+                [x_orig, y_orig, z_orig] = [sum(xs)/numpts, sum(ys)/numpts, sum(zs)/numpts]
+        for j in range(numpts):
+            dist1 = math.sqrt((xs[j]-x_orig)**2 + (ys[j]-y_orig)**2 + (zs[j]-z_orig)**2)
+            if dist1 > max_dist:
+                max_dist = dist1
+        self.browser.ExecuteJavascript("set_neuron_section_data(%s);" % json.dumps([geo, max_dist]))
 
     def embed_browser(self):
         global browser_created_count, browser_weakvaldict
