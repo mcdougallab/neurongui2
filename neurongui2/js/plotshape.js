@@ -1,4 +1,5 @@
 var neuron_section_data = undefined;
+var _shape_plots_mapping = {};
 
 function set_neuron_section_data(new_data) {
     neuron_section_data = new_data;
