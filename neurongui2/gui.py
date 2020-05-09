@@ -263,7 +263,11 @@ class Graph(Widget):
     def mappings(self):
         return self.var_mappings
 
-    def addvar(self, label, var):
+    def addvar(self, label, var=None):
+        default_lab = False
+        if var is None:
+            var = label
+            default_lab = True
         current_uuid = uuid.uuid4().hex
         if (isinstance(var, str)):  #retrieve cas
             spl = var.split('(')
@@ -273,6 +277,8 @@ class Graph(Widget):
                 seg = float(spl[1][:-1])
             ptr = getattr(h.cas()(seg), "_ref_" + spl[0])
             self.var_mappings.update({current_uuid: ptr}) 
+            if default_lab:
+                label = spl[0]
         else:   #TODO: if not a ptr
             self.var_mappings.update({current_uuid: var})
         self.labels.update({current_uuid: label})
@@ -283,4 +289,4 @@ class Graph(Widget):
         if not self.var_mappings:
             return '<div class="lineplot"></div>'
         else:
-            return """<div class="lineplot" data-x-var="h.t" data-y-var="{}" data-xlab="time (ms)" data-legendlabs="{}" ></div>""".format(";".join(self.var_mappings.keys()), ";".join(self.labels.values()))
+            return """<div class="lineplot" data-x-var="h.t" data-y-var="{}" data-xlab="time (ms)" data-legendlabs="{}"></div>""".format(";".join(self.var_mappings.keys()), ";".join(self.labels.values()))
