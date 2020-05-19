@@ -55,13 +55,13 @@ function arrayMax(arr) {
 $('[data-variable]').each( function () {
     to_update.push($(this).attr('data-variable'));
 });
-$('[data-x-var]').each( function() {
+$("[class='lineplot'][data-x-var]").each( function() {
     var x_var = $(this).attr('data-x-var');
     if (!graph_vars.includes(x_var)) { 
         graph_vars.push(x_var);
     };
 })
-$('[data-y-var]').each( function() {
+$("[class='lineplot'][data-y-var]").each( function() {
     $.each($(this).attr('data-y-var').split(';'), function(i, yvar) {
         if (!graph_vars.includes(yvar)) {
             graph_vars.push(yvar);
@@ -99,6 +99,11 @@ $(function() {
         _shape_plots.push(new ShapePlot($(elem)));
     });
 });
+
+function toggle_sp_diam() {
+    $('.shapeplot').attr('data-mode', 1 - $('.shapeplot').attr('data-mode')); 
+    for (var sp of _shape_plots) {sp.force_update()};
+}
 
 var window_resize_timeout;
 

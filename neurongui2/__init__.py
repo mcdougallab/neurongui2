@@ -283,6 +283,7 @@ class NEURONWindow(NEURONFrame):
         self.ready_status = 1   #browser sends signal that it's ready when done updating graphs
         self.data_waiting = None    #graph data waiting for browser to be ready
         self.t_tracker_vec = "h.t"  #which vector to use for graph tracking
+        self.shapeplot_menu = None
 
         # used for tracking when shape plots (if any) need updating
         self._last_diam_change_count = None
@@ -398,7 +399,7 @@ class NEURONWindow(NEURONFrame):
             ys.append(sec.y3d(n3d - 1))
             zs.append(sec.z3d(n3d - 1))
         numpts = len(xs)
-        if use_centroid:
+        if use_centroid and secs:
             if len(secs) <= 2:
                 [x_orig, y_orig, z_orig] = [secs[0].x3d(0), secs[0].y3d(0), secs[0].z3d(0)]
             else:
@@ -407,7 +408,7 @@ class NEURONWindow(NEURONFrame):
             dist1 = math.sqrt((xs[j]-x_orig)**2 + (ys[j]-y_orig)**2 + (zs[j]-z_orig)**2)
             if dist1 > max_dist:
                 max_dist = dist1
-        self.browser.ExecuteJavascript("set_neuron_section_data(%s);" % json.dumps([geo, max_dist]))
+        self.browser.ExecuteFunction("set_neuron_section_data", [geo, max_dist])
 
     def embed_browser(self):
         global browser_created_count, browser_weakvaldict
@@ -440,7 +441,7 @@ class NEURONWindow(NEURONFrame):
 
     def OnSetFocus(self, _):
         # TODO: can we be smarter about when we update shapeplot menus?
-        _update_shapeplot_menus()
+        _update_shapeplot_menus(self)
 
         if not self.browser:
             return
@@ -576,7 +577,7 @@ _shapeplot_menus = []
 #       rotates, etc, smoothly but toggling show-diam, etc
 def make_shapeplot_standalone(*args, **kwargs):
     html = """
-        <div class="shapeplot" data-mode='1' style="width:100vw; height:100vh;"></div>
+        <div class="shapeplot" data-mode='1' style="width:90vw; height:90vh;"></div>
     """
     my_menu = wx.Menu()
     show_diam_menuitem = my_menu.AppendCheckItem(_menu_id(), "Show Diam")
@@ -588,25 +589,26 @@ def make_shapeplot_standalone(*args, **kwargs):
     my_frame = make_browser_html(html, title='Shape plot', size=(300, 300), custom_menus={'ShapePlot': my_menu})
     def toggle_show_diam(*args, **kwargs):
         # TODO: this isn't a toggle... we should actually use the toggle menu item type
-        my_frame.browser.ExecuteJavascript("$('.shapeplot').attr('data-mode', 1 - $('.shapeplot').attr('data-mode')); for (var sp of _shape_plots) {sp.force_update()};")
+        my_frame.browser.ExecuteFunction("toggle_sp_diam")
     my_frame.Bind(wx.EVT_MENU, toggle_show_diam, show_diam_menuitem)
-    _update_shapeplot_menus()
+    my_frame.shapeplot_menu = plotwhat_menu
+    _update_shapeplot_menus(my_frame)
     return my_frame
 
-def _update_shapeplot_menus(*args, **kwargs):
+def _update_shapeplot_menus(this_browser, *args, **kwargs):
     # TODO: should use checkboxes to show what (if anything) is currently plotted
     #       this is part of why I didn't try to have a single plotwhat menu (since different selections)
     #       no idea how that would have worked, anyway
     # TODO: can we do this without destroying everything?
     # TODO: if plotting different sections, should we treat the lists of allowed rangevars differently?
     rangevars = rangevars_present(list(h.allsec()))
-    for menu in _shapeplot_menus:
+    menu = this_browser.shapeplot_menu
+    if menu:
         for item in menu.GetMenuItems():
             menu.Delete(item)
         for rangevar in rangevars:
             menu.Append(_menu_id(), rangevar['name'])
             # TODO: would need to somehow bind this to the frame or... something... 
-
 
 
 # TODO: remove the need for this
@@ -922,7 +924,6 @@ def _py_function_handler(browser_id, function):
     current_shell.clearCommand()
     #current_shell.write('\n')
 
-    #exec(function, shared_locals, this_browser.user_mappings)
     my_fn = this_browser.user_mappings[function]
     my_fn()     #callable
 
@@ -1064,8 +1065,7 @@ def _set_relevant_vars(to_update):
 
     this_browser.monitor_loop = monitor_browser_vars(this_browser)
     # initiate graphs with axes
-    this_browser.browser.ExecuteJavascript("update_graph_vectors([], {})".format(json.dumps(["initiate"])))
-    
+    this_browser.browser.ExecuteFunction("update_graph_vectors", [], ["initiate"]) 
 
 def delete_var(v):
     del shared_locals[v]
@@ -1095,7 +1095,7 @@ def send_graph_vars(this_browser, action):
             to_send[k] = list(graph_vars[k])
         elif action == "update":
             to_send[k] = list(graph_vars[k])[this_browser.t_tracker:]  # only the new data
-    this_browser.browser.ExecuteJavascript("update_graph_vectors({}, {})".format(json.dumps(to_send), json.dumps([action])))
+    this_browser.browser.ExecuteFunction("update_graph_vectors", to_send, [action])
 
 def _update_browser_vars(this_browser, locals_copy):
     # check for changes to the morphology
@@ -1108,7 +1108,7 @@ def _update_browser_vars(this_browser, locals_copy):
         # TODO: monitor for the presence of a shape plot... only do this when there actually is one
         this_browser._do_reset_geometry()
         # TODO: do this only for this browser's menu; this will eliminate the need for the for loop in _update_shapeplot_menus
-        _update_shapeplot_menus()
+        _update_shapeplot_menus(this_browser)
 
     # create dictionary of the changed variables 
     locals_copy.update(this_browser.browser_sent_vars) # don't resend recently updated from browser
@@ -1120,7 +1120,7 @@ def _update_browser_vars(this_browser, locals_copy):
         del locals_copy[d]
     # update the changed variables for javascript
     if changed_vars or deleted_vars:
-        this_browser.browser.ExecuteJavascript("update_html_variable_displays({}, {})".format(json.dumps(changed_vars), json.dumps(deleted_vars)))
+        this_browser.browser.ExecuteFunction("update_html_variable_displays", changed_vars, deleted_vars)
     # handle graph vectors - if browser ready and there are graphs
     if this_browser.graph_vars:
         current_lengthT = len(this_browser.graph_vars.get(this_browser.t_tracker_vec))
