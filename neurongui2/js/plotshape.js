@@ -1,5 +1,7 @@
 var neuron_section_data = undefined;
 var _shape_plots_mapping = {};
+var id_map = {};
+var mouse = new THREE.Vector2();
 
 function set_neuron_section_data(new_data) {
     neuron_section_data = new_data;
@@ -15,6 +17,31 @@ function ShapePlot(container) {
     this.section_data = undefined;
     this.vmin = -100;
     this.vmax = 100;
+    this.container.on( 'click', clickEvent);
+    _shape_plots_mapping[this.container.attr('id')] = this;
+}
+
+function clickEvent(event) {
+    //TODO: try only-one-pixel option again
+    var plot = _shape_plots_mapping[$(this).attr('id')];
+    mouse.x = event.clientX;
+    mouse.y = plot.tc.height - event.clientY;
+
+    // virtual buffer read 
+    var pixelBuffer = new Uint8Array(3);
+    render = plot.tc.renderer;
+    render.render(plot.tc.pickingScene, plot.tc.camera, plot.tc.pickingTexture);
+    render.readRenderTargetPixels(plot.tc.pickingTexture, mouse.x, mouse.y, 1, 1, pixelBuffer);
+
+    const id = (pixelBuffer[0] << 16) | (pixelBuffer[1] << 8) | (pixelBuffer[2]);
+    if (id != 0) {
+        console.log(id);
+    }
+    o = id_map[id];
+    if (o) {
+        console.log('intersected!');
+    } 
+
 }
 
 ShapePlot.prototype.update = function() {
