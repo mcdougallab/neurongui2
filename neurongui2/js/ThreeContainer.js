@@ -80,6 +80,7 @@ ThreeContainer.prototype.render = function() {
 ThreeContainer.prototype.clearLines = function() {
     console.log('clearLines');
     this.scene.remove.apply(this.scene, this.scene.children);
+    this.pickingScene.remove.apply(this.pickingScene, this.pickingScene.children);
     this.lines = [];
 }
 
