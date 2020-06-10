@@ -573,6 +573,14 @@ def make_voltage_axis_standalone():
 
 _shapeplot_menus = []
 
+def shapeplot_callback(*args):
+    ### placeholder callback for when a Plot What item is selected ###
+    event = args[0]
+    menu_id = event.GetId()
+    obj = event.GetEventObject()
+    menu_label = obj.GetLabelText(menu_id)
+    #print(menu_label)
+
 # TODO: there is a decent amount of latency on recalculating a cell with "real" morphology; e.g. c91662
 #       rotates, etc, smoothly but toggling show-diam, etc
 def make_shapeplot_standalone(*args, **kwargs):
@@ -582,13 +590,12 @@ def make_shapeplot_standalone(*args, **kwargs):
     my_menu = wx.Menu()
     show_diam_menuitem = my_menu.AppendCheckItem(_menu_id(), "Show Diam")
     plotwhat_menu = wx.Menu()
-    plotwhat_menu.Append(_menu_id(), 'v')
+    plotwhat_menu.AppendRadioItem(_menu_id(), 'v')
     my_menu.AppendSubMenu(plotwhat_menu, 'Plot What')
     _shapeplot_menus.append(plotwhat_menu)
     my_menu.AppendSeparator()
     my_frame = make_browser_html(html, title='Shape plot', size=(300, 300), custom_menus={'ShapePlot': my_menu})
     def toggle_show_diam(*args, **kwargs):
-        # TODO: this isn't a toggle... we should actually use the toggle menu item type
         my_frame.browser.ExecuteFunction("toggle_sp_diam")
     my_frame.Bind(wx.EVT_MENU, toggle_show_diam, show_diam_menuitem)
     my_frame.shapeplot_menu = plotwhat_menu
@@ -597,18 +604,19 @@ def make_shapeplot_standalone(*args, **kwargs):
 
 def _update_shapeplot_menus(this_browser, *args, **kwargs):
     # TODO: should use checkboxes to show what (if anything) is currently plotted
-    #       this is part of why I didn't try to have a single plotwhat menu (since different selections)
-    #       no idea how that would have worked, anyway
-    # TODO: can we do this without destroying everything?
-    # TODO: if plotting different sections, should we treat the lists of allowed rangevars differently?
     rangevars = rangevars_present(list(h.allsec()))
     menu = this_browser.shapeplot_menu
     if menu:
+        checked = None
         for item in menu.GetMenuItems():
+            if item.IsChecked():
+                checked = item.GetItemLabelText()
             menu.Delete(item)
-        for rangevar in rangevars:
-            menu.Append(_menu_id(), rangevar['name'])
-            # TODO: would need to somehow bind this to the frame or... something... 
+        for rv in rangevars:
+            menu_id = _menu_id()
+            this_browser.Bind(wx.EVT_MENU, shapeplot_callback, menu.AppendRadioItem(menu_id, rv['name']))
+            if rv['name'] == checked:
+                menu.FindItemById(menu_id).Check()
 
 
 # TODO: remove the need for this
@@ -1107,7 +1115,6 @@ def _update_browser_vars(this_browser, locals_copy):
         this_browser._last_structure_change_count = _structure_change_count.value
         # TODO: monitor for the presence of a shape plot... only do this when there actually is one
         this_browser._do_reset_geometry()
-        # TODO: do this only for this browser's menu; this will eliminate the need for the for loop in _update_shapeplot_menus
         _update_shapeplot_menus(this_browser)
 
     # create dictionary of the changed variables 
