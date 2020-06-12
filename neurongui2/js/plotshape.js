@@ -34,12 +34,10 @@ function clickEvent(event) {
     render.readRenderTargetPixels(plot.tc.pickingTexture, mouse.x, mouse.y, 1, 1, pixelBuffer);
 
     const id = (pixelBuffer[0] << 16) | (pixelBuffer[1] << 8) | (pixelBuffer[2]);
-    if (id != 0) {
-        console.log(id);
-    }
     o = id_map[id];
     if (o) {
         console.log('intersected!');
+        _section_intersected(browser_id, id);
     } 
 
 }

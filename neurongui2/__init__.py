@@ -284,6 +284,7 @@ class NEURONWindow(NEURONFrame):
         self.data_waiting = None    #graph data waiting for browser to be ready
         self.t_tracker_vec = "h.t"  #which vector to use for graph tracking
         self.shapeplot_menu = None
+        self.section_dict = None
 
         # used for tracking when shape plots (if any) need updating
         self._last_diam_change_count = None
@@ -383,6 +384,7 @@ class NEURONWindow(NEURONFrame):
     def _do_reset_geometry(self):
         h.define_shape()
         secs = list(h.allsec())
+        self.section_dict = {}
         geo = []
         xs, ys, zs = [],[],[]
         max_dist = 0
@@ -392,8 +394,9 @@ class NEURONWindow(NEURONFrame):
             [x_orig, y_orig, z_orig] = [h.soma.x3d(0), h.soma.y3d(0), h.soma.z3d(0)]
         except:
             use_centroid = True
-        for sec in secs:
+        for ind,sec in enumerate(secs):
             geo += _segment_3d_pts(sec)
+            self.section_dict[ind+1] = sec
             n3d = sec.n3d()
             xs.append(sec.x3d(n3d - 1))
             ys.append(sec.y3d(n3d - 1))
@@ -438,6 +441,7 @@ class NEURONWindow(NEURONFrame):
         self.register_binding("_py_function_handler", _py_function_handler)
         self.register_binding("_set_relevant_vars", _set_relevant_vars)
         self.register_binding("_flag_browser_ready", _flag_browser_ready)
+        self.register_binding("_section_intersected", _section_intersected)
 
     def OnSetFocus(self, _):
         # TODO: can we be smarter about when we update shapeplot menus?
@@ -1074,6 +1078,12 @@ def _set_relevant_vars(to_update):
     this_browser.monitor_loop = monitor_browser_vars(this_browser)
     # initiate graphs with axes
     this_browser.browser.ExecuteFunction("update_graph_vectors", [], ["initiate"]) 
+
+def _section_intersected(browser_id, line_id):
+    global browser_weakvaldict
+    this_browser = browser_weakvaldict[browser_id]
+    sec = this_browser.section_dict[line_id]
+    print('Intersected: ', sec.name())
 
 def delete_var(v):
     del shared_locals[v]
