@@ -285,6 +285,9 @@ class NEURONWindow(NEURONFrame):
         self.t_tracker_vec = "h.t"  #which vector to use for graph tracking
         self.shapeplot_menu = None
         self.section_dict = None
+        self.shapeplot_ptrvectors = {}
+        self.sp_plotwhats = {}
+        self.plotwhat_none = {}
 
         # used for tracking when shape plots (if any) need updating
         self._last_diam_change_count = None
@@ -302,7 +305,7 @@ class NEURONWindow(NEURONFrame):
         with open(os.path.join(base_path, "main_script.html")) as f:
             my_wrapper_html = f.read()
         
-        with open(os.path.join(base_path, 'js', 'plotshape.js')) as f:
+        with open(os.path.join(base_path, 'js', 'plotshapeNew.js')) as f:
             plotshape_js = f.read()
 
         with open(os.path.join(base_path, 'js', 'three.js')) as f:
@@ -311,14 +314,17 @@ class NEURONWindow(NEURONFrame):
         with open(os.path.join(base_path, 'js', 'MeshLines.js')) as f:
             meshlines = f.read()
 
-        with open(os.path.join(base_path, 'js', 'ThreeContainer.js')) as f:
+        with open(os.path.join(base_path, 'js', 'ThreeContainerNew.js')) as f:
             three_container = f.read()
 
         with open(os.path.join(base_path, 'auto_style.css')) as f:
             stylesheet = f.read()
 
+        with open(os.path.join(base_path, 'js', 'BufferGeometryUtils.js')) as f:
+            bufferutils = f.read()
+
         self.wrapper_html = my_wrapper_html.replace("HTML_GOES_HERE", my_html).replace('/*STYLESHEET_HERE*/', stylesheet)
-        self.wrapper_html = self.wrapper_html.replace('DECLARE_THREE_JS_HERE', three_js).replace('DECLARE_MESHLINES', meshlines).replace('DECLARE_THREECONTAINER', three_container).replace('DECLARE_PLOTSHAPE_CODE', plotshape_js)
+        self.wrapper_html = self.wrapper_html.replace('DECLARE_THREE_JS_HERE', three_js).replace('DECLARE_MESHLINES', meshlines).replace('DECLARE_THREECONTAINER', three_container).replace('DECLARE_PLOTSHAPE_CODE', plotshape_js).replace('DECLARE_BUFFERUTILS_HERE', bufferutils)
 
         # Must ignore X11 errors like 'BadWindow' and others by
         # installing X11 error handlers. This must be done after
@@ -381,7 +387,7 @@ class NEURONWindow(NEURONFrame):
             icon = wx.IconFromBitmap(wx.Bitmap(icon_file, wx.BITMAP_TYPE_PNG))
             self.SetIcon(icon)
 
-    def _do_reset_geometry(self):
+    def _do_reset_geometry(self, browser_id):
         h.define_shape()
         secs = list(h.allsec())
         self.section_dict = {}
@@ -412,6 +418,8 @@ class NEURONWindow(NEURONFrame):
             if dist1 > max_dist:
                 max_dist = dist1
         self.browser.ExecuteFunction("set_neuron_section_data", [geo, max_dist])
+        for sp_id in self.shapeplot_ptrvectors.keys():  # udpate sp ptrvectors
+            _setup_shapeplot_ptrvector(browser_id, sp_id, self.sp_plotwhats[sp_id])
 
     def embed_browser(self):
         global browser_created_count, browser_weakvaldict
@@ -442,6 +450,7 @@ class NEURONWindow(NEURONFrame):
         self.register_binding("_set_relevant_vars", _set_relevant_vars)
         self.register_binding("_flag_browser_ready", _flag_browser_ready)
         self.register_binding("_section_intersected", _section_intersected)
+        self.register_binding("_setup_shapeplot_ptrvector", _setup_shapeplot_ptrvector)
 
     def OnSetFocus(self, _):
         # TODO: can we be smarter about when we update shapeplot menus?
@@ -564,7 +573,7 @@ class CefApp(wx.App):
 def make_voltage_axis_standalone():
     html = """
         <div class="lineplot" data-x-var="h.t" data-y-var="seg.v" data-xlab="time (ms)" data-legendlabs="voltage (mV)" style="width:90vw; height:90vh;"></div>
-    """
+    """   
     this_sec = None
     for sec in h.allsec():
         this_sec = sec
@@ -578,18 +587,24 @@ def make_voltage_axis_standalone():
 _shapeplot_menus = []
 
 def shapeplot_callback(*args):
-    ### placeholder callback for when a Plot What item is selected ###
+    # Callback when a Plot What item is selected
     event = args[0]
     menu_id = event.GetId()
     obj = event.GetEventObject()
     menu_label = obj.GetLabelText(menu_id)
-    #print(menu_label)
+    this_browser = obj.GetWindow()
+    # change shapeplots data-plotwhat and scalemin, scalemax (have defaults somewhere)
+    this_browser.browser.ExecuteFunction("change_PlotWhat", menu_label)
+    # setup browser's ptrvectors for new plotwhat variable
+    for sp_id in this_browser.shapeplot_ptrvectors.keys():
+        this_browser.sp_plotwhats[sp_id] = menu_label
+        _setup_shapeplot_ptrvector(this_browser.browser_id, sp_id, menu_label)
 
 # TODO: there is a decent amount of latency on recalculating a cell with "real" morphology; e.g. c91662
 #       rotates, etc, smoothly but toggling show-diam, etc
 def make_shapeplot_standalone(*args, **kwargs):
     html = """
-        <div class="shapeplot" data-mode='1' style="width:90vw; height:90vh;"></div>
+        <div class="shapeplot" data-mode='1' data-plotwhat='v' data-scalemin='-70' data-scalemax='70' style="width:90vw; height:90vh;"></div>
     """
     my_menu = wx.Menu()
     show_diam_menuitem = my_menu.AppendCheckItem(_menu_id(), "Show Diam")
@@ -606,8 +621,42 @@ def make_shapeplot_standalone(*args, **kwargs):
     _update_shapeplot_menus(my_frame)
     return my_frame
 
+def _setup_shapeplot_ptrvector(browser_id, sp_id, plotwhat):
+    # accounts for original setup, changing plotwhat, and changing morphology
+    global browser_weakvaldict
+    this_browser = browser_weakvaldict[browser_id]
+
+    sections = list(h.allsec())
+    size = 0
+    for sec in sections:
+        size += sec.nseg
+    ptvec = this_browser.shapeplot_ptrvectors.get(sp_id)
+    logging.debug('size: '+str(size))
+    if not ptvec:
+        this_browser.sp_plotwhats[sp_id] = plotwhat
+        if size == 0:
+            this_browser.shapeplot_ptrvectors[sp_id] = None
+        else:
+            this_browser.shapeplot_ptrvectors[sp_id] = h.PtrVector(size)  #original setup 
+            ptvec  = this_browser.shapeplot_ptrvectors[sp_id]
+            this_browser.plotwhat_none[sp_id] = [0 for i in range(size)]
+            logging.debug('creating new')
+    elif ptvec.size() < size:
+        ptvec.resize(size) # morphology added, need to resize
+        this_browser.plotwhat_none[sp_id] = [0 for i in range(size)]
+    i = 0
+    for sec in sections: 
+        for seg in sec:
+            if hasattr(seg, "_ref_"+plotwhat):
+                ptvec.pset(i, getattr(seg, "_ref_"+plotwhat))
+                this_browser.plotwhat_none[sp_id][i] = 0
+            else:
+                this_browser.plotwhat_none[sp_id][i] = 1    # mark as None value to plot
+            i += 1
+
+
 def _update_shapeplot_menus(this_browser, *args, **kwargs):
-    # TODO: should use checkboxes to show what (if anything) is currently plotted
+    # TODO: allow for nothing to be currently plotted
     rangevars = rangevars_present(list(h.allsec()))
     menu = this_browser.shapeplot_menu
     if menu:
@@ -1115,6 +1164,17 @@ def send_graph_vars(this_browser, action):
             to_send[k] = list(graph_vars[k])[this_browser.t_tracker:]  # only the new data
     this_browser.browser.ExecuteFunction("update_graph_vectors", to_send, [action])
 
+def gather_ptrvectors(this_browser):
+    segvalues = {}
+    for sp_id in this_browser.shapeplot_ptrvectors.keys():
+        pv = this_browser.shapeplot_ptrvectors[sp_id]
+        if pv:
+            v = h.Vector(pv.size())
+            pv.gather(v)
+            segvalues[sp_id] = [v.to_python(), this_browser.plotwhat_none[sp_id]]
+    if segvalues:
+        this_browser.browser.ExecuteFunction("update_spcolors", segvalues)
+
 def _update_browser_vars(this_browser, locals_copy):
     # check for changes to the morphology
     old_diam_changed = h.diam_changed
@@ -1123,9 +1183,11 @@ def _update_browser_vars(this_browser, locals_copy):
         h.doNotify()
         this_browser._last_diam_change_count = _diam_change_count.value
         this_browser._last_structure_change_count = _structure_change_count.value
-        # TODO: monitor for the presence of a shape plot... only do this when there actually is one
-        this_browser._do_reset_geometry()
+        # reset_geometry needs to be called even when shapeplot doesn't exist yet
+        this_browser._do_reset_geometry(this_browser.browser_id)
         _update_shapeplot_menus(this_browser)
+
+    gather_ptrvectors(this_browser)
 
     # create dictionary of the changed variables 
     locals_copy.update(this_browser.browser_sent_vars) # don't resend recently updated from browser
@@ -1157,7 +1219,7 @@ def _update_browser_vars(this_browser, locals_copy):
 def setupSim():
     shared_locals['shell'].runfile('simulation_setup.py')
 
-shared_locals = {'make_browser': make_browser, 'quit': sys.exit, 'weakdict':browser_weakvaldict, 'setupSim':setupSim}
+shared_locals = {'make_browser': make_browser_html, 'quit': sys.exit, 'weakdict':browser_weakvaldict, 'setupSim':setupSim}
 
 # todo: should this be here or in main
 from . import gui

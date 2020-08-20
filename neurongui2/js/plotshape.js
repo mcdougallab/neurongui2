@@ -6,7 +6,7 @@ var mouse = new THREE.Vector2();
 function set_neuron_section_data(new_data) {
     neuron_section_data = new_data;
     for(sp of _shape_plots) {
-        sp.update();
+        sp.update(0);
     }
 }
 
@@ -34,50 +34,34 @@ function clickEvent(event) {
     render.readRenderTargetPixels(plot.tc.pickingTexture, mouse.x, mouse.y, 1, 1, pixelBuffer);
 
     const id = (pixelBuffer[0] << 16) | (pixelBuffer[1] << 8) | (pixelBuffer[2]);
-    o = id_map[id];
-    if (o) {
+    if (id != 0) {
+        var index = id_map[id];
+        var clicked_pts = [];
+        for (var k=0; k < 144; k++) {
+            if ((index+k) < plot.tc.points.length) {
+            clicked_pts.push(plot.tc.points[index+k]);}
+        }
         console.log('intersected!');
         _section_intersected(browser_id, id);
+        console.log(clicked_pts);
     } 
 
 }
 
-ShapePlot.prototype.update = function() {
+ShapePlot.prototype.update = function(diam_flag) {
+    // TODO: is this check necessary? Can just check if undefined?
     if (this.section_data !== neuron_section_data[0]) {
         this.section_data = neuron_section_data[0];
-        this.camera_dist = neuron_section_data[1]*2.5;
-        this.tc.camera.position.set(0,0,this.camera_dist);
+        if (!diam_flag) {
+            this.camera_dist = neuron_section_data[1]*2.5;
+            this.tc.camera.position.set(0,0,this.camera_dist);
+        }
         this.tc.onContainerResize();
         this.tc.clearLines();
         var my_mode = this.container.attr('data-mode');
         if (my_mode == undefined) {
             my_mode = 1;
         }
-        function const_function(val) {
-            return function(p) {return val};
-        }
-        function sp_interpolater(arc3d, ys, diam_scale) {
-            var my_arc3d = [];
-            var lo = arc3d[0];
-            var hi = arc3d[arc3d.length - 1];
-            var delta = hi - lo;
-            for (var i = 0; i < arc3d.length; i++) {
-                my_arc3d.push((arc3d[i] - lo) / delta);
-            }
-            return function(p) {
-                for(var i = 1; i < my_arc3d.length; i++) {
-                    var me = my_arc3d[i];
-                    if (p < me) {
-                        var last = my_arc3d[i - 1];
-                        var x = (p - last) / (me - last);
-                        return diam_scale * (x * ys[i] + (1 - x) * ys[i - 1]);
-                    }
-                }
-                return ys[my_arc3d.length - 1] * diam_scale;
-            }
-        }
-        var const_diam_f = const_function(4 * this.diam_scale);
-        var my_width_rule;
         for(var i = 0; i < this.section_data.length; i++) {
             var my_segment = this.section_data[i];
             var xs = my_segment[0];
@@ -85,29 +69,32 @@ ShapePlot.prototype.update = function() {
             var zs = my_segment[2];
             var ds = my_segment[3];
             var arcs = my_segment[4];
-            var geo = new THREE.Geometry();
+            var geo = [];
             for(var j = 0 ; j < xs.length; j++) {
-                geo.vertices.push(new THREE.Vector3(xs[j], ys[j], zs[j]));
+                geo.push([xs[j], ys[j], zs[j]]);
             }
-            if (my_mode == 0) {
-                my_width_rule = sp_interpolater(arcs, ds, 4 * this.diam_scale);
-            } else {
-                my_width_rule = const_diam_f;
+            var shown_diams = [];
+            if (my_mode == 1) {
+                for (var k=0; k < ds.length; k++){
+                    shown_diams.push(0.5);
+                }
             }
-            this.tc.makeLine(geo, my_width_rule);
+            else {shown_diams = ds;}
+            this.tc.addLine(geo, shown_diams);
         }
+        this.tc.renderLines();
     }
 }
 
-ShapePlot.prototype.force_update = function() {
+ShapePlot.prototype.force_update = function(diam_flag) {
     this.section_data = undefined;
-    this.update();
+    this.update(diam_flag);
 }
 
 
 ShapePlot.prototype.set_diam_scale = function(diam) {
     this.diam_scale = diam;
-    this.force_update();
+    this.force_update(0);
 }
 
 ShapePlot.prototype.update_colors = function(data) {

@@ -8,10 +8,13 @@
         <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
         <script src = "https://code.jquery.com/ui/1.10.4/jquery-ui.js"></script>
         <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+        <script src="https://d3js.org/d3.v5.min.js"></script>
+        <script src="https://d3js.org/d3-scale-chromatic.v1.min.js"></script>
         <script>DECLARE_THREE_JS_HERE</script>
         <script>DECLARE_MESHLINES</script>
         <script>DECLARE_THREECONTAINER</script>
         <script>DECLARE_PLOTSHAPE_CODE</script>
+        <script>DECLARE_BUFFERUTILS_HERE</script>
         <style>/*STYLESHEET_HERE*/</style>
         <script>
             function _update_html(selector, content) {
@@ -97,12 +100,19 @@ $(function() {
     $("div[class='shapeplot']").each(function(i, elem) {
         $(elem).attr('id', `SP${i}`);
         _shape_plots.push(new ShapePlot($(elem)));
+        _setup_shapeplot_ptrvector(browser_id, `SP${i}`, $(elem).attr('data-plotwhat'));
     });
 });
 
 function toggle_sp_diam() {
     $('.shapeplot').attr('data-mode', 1 - $('.shapeplot').attr('data-mode')); 
-    for (var sp of _shape_plots) {sp.force_update()};
+    for (var sp of _shape_plots) {sp.force_update(1)};
+}
+
+function change_PlotWhat(variable) {
+    $('.shapeplot').attr('data-plotwhat', variable);
+    console.log(variable);
+    //TODO: change the colorscale min and max dep. on the variable?
 }
 
 var window_resize_timeout;
@@ -215,6 +225,26 @@ $('[data-onclick]').not('input:checkbox').not('button.state').click(function() {
     _py_function_handler(browser_id, $(this).attr('data-onclick'));
 });
 
+function update_spcolors(segment_values) {
+    $.each(segment_values, function(sp_id, values) {
+        var spdiv = $(`#${sp_id}`);
+        var plot = _shape_plots_mapping[sp_id];
+        var FindColor = d3.scaleSequential()
+                .domain([spdiv.attr('data-scalemin'), spdiv.attr('data-scalemax')])
+                .interpolator(d3.interpolateViridis);
+        // map segment values to a colorscale
+        for (i = 0; i < values[0].length; i++) {
+            if (!values[1][i]) {
+                var segcolor = d3.rgb(FindColor(values[0][i]));
+                var R = segcolor.r/255, G = segcolor.g/255, B = segcolor.b/255;
+                tricolor = [R,G,B,R,G,B,R,G,B];}
+            else {tricolor = [0,0,0,0,0,0,0,0,0];}
+            plot.tc.linecolors[i] = tricolor;
+        }
+        plot.tc.ReColor();
+    });
+}
+
 
 function make_lineplot(x_dat, y_dat, object) {
     console.log("making lineplot");
@@ -247,7 +277,8 @@ function make_lineplot(x_dat, y_dat, object) {
             y: series_dat,
             name: label,
             mode: 'lines',
-            line: {color: series_color}
+            line: {color: series_color},
+            showlegend: true
         })
 
         index++;
