@@ -49,7 +49,13 @@ ThreeContainer.prototype.onContainerResize = function() {
 
 ThreeContainer.prototype.addLine = function (geo, diams) {
     var n = new THREE.Vector3();
+    var n2 = new THREE.Vector3();
     var v2 = new THREE.Vector3();
+    var prev_n = new THREE.Vector3();
+    var plane2 = new THREE.Plane();
+    var p1 = new THREE.Vector3();
+    var p2 = new THREE.Vector3();
+    var p3 = new THREE.Vector3();
     var index = this.points.length;
     var start_pts, end_pts, start_JoinPoints;
 
@@ -58,19 +64,49 @@ ThreeContainer.prototype.addLine = function (geo, diams) {
     var startflag = true;
     for (g=0; g < (geolength-1); g++) {
         var x0=geo[g][0], y0=geo[g][1], z0=geo[g][2], x1=geo[g+1][0], y1=geo[g+1][1], z1=geo[g+1][2];
-        var r0=diams[g], r1=diams[g+1];
+        var r0=diams[g]/2, r1=diams[g+1]/2;
 
         if (g==geolength-2) {   // catch if it's last line in segment
             endflag = true;
         }
         
-        // find the normal vector to the base of the prism (n) and a random perpendicular (v2)
-        n.set(x1-x0,y1-y0,z1-z0);
-        if (n.z==0) {
-            if (n.y==0) {v2.set(0,1,0);}
-            else {v2.set(1,-1*(n.x/n.y), 0);}
+        if (startflag) {
+            // find the normal vector to the base of the prism (n) and a random perpendicular (v2)
+            n.set(x1-x0,y1-y0,z1-z0);
+            n.normalize();
+            prev_n.copy(n);
+            if (n.z==0) {
+                if (n.y==0) {v2.set(0,1,0);}
+                else {v2.set(1,-1*(n.x/n.y), 0);}
+            }
+            else {v2.set(1, 0, -1*(n.x/n.z));}
         }
-        else {v2.set(1, 0, -1*(n.x/n.z));}
+        else {
+            // calculate to align with previous line segment
+            n.copy(prev_n);
+            n2.set(x1-x0,y1-y0,z1-z0);
+            n2.normalize();
+            prev_n.copy(n2);
+
+            n2.multiplyScalar(r0*2);            // NEED THIS OR NO????
+            plane2.setFromNormalAndCoplanarPoint(n2, new THREE.Vector3(x0,y0,z0));
+
+            //create the line segment to project from one corner (v4) to the next
+            n.add(n2);
+            n.normalize();
+            n.multiplyScalar(r0*2);
+            var vertex4 = start_JoinPoints[0];
+            var end0 = new THREE.Vector3(vertex4[0]+n.x, vertex4[1]+n.y, vertex4[2]+n.z);
+            var end1 = new THREE.Vector3(vertex4[0]-n.x, vertex4[1]-n.y, vertex4[2]-n.z);
+            var projected = new THREE.Line3(end0, end1);
+
+            var intersection = new THREE.Vector3();
+            plane2.intersectLine(projected, intersection);
+
+            // use intersection found as new vertex0, by setting v2
+            v2.set(intersection.x-x0, intersection.y-y0, intersection.z-z0);
+            n.copy(n2);
+        }
 
         n.cross(v2);   
         n.normalize();
@@ -97,14 +133,40 @@ ThreeContainer.prototype.addLine = function (geo, diams) {
             }
             startflag=false;
         }
-        else {   // add the previous join's points except if it's the first segment
-            //start_JoinPoints.push(...start_pts);
+        else {   // determine the join points (for before this segment) and add
+            // trying out finding the right order for verts (8/19) ---------------------------
+            var plane3 = new THREE.Plane();
+            vertex4_prev = start_JoinPoints[0];
+            vertex5_prev = start_JoinPoints[1];
+            vertex6_prev = start_JoinPoints[2];
+            p1.set(vertex4_prev[0],vertex4_prev[1],vertex4_prev[2]);
+            p2.set(vertex0[0],vertex0[1],vertex0[2]);
+            p3.set(vertex6_prev[0],vertex6_prev[1],vertex6_prev[2]);
+
+            // next: see the sign of vertex5, and if it's different from sign of vertex 11 then switch 11 and 33
+            // use dot product of abcd and xyz1 to find sign
+            plane3.setFromCoplanarPoints(p1,p2,p3);
+            N = plane3.normal;
+            
+            var d = N.x*vertex4_prev[0] + N.y*vertex4_prev[1] + N.z*vertex4_prev[2];
+            var abcd = new THREE.Vector4(N.x,N.y,N.z,-1*d);
+            var xyz1 = new THREE.Vector4(vertex5_prev[0],vertex5_prev[1],vertex5_prev[2],1);
+            var dot5 = xyz1.dot(abcd);
+
+            xyz1.set(vertex1[0],vertex1[1],vertex1[2],1);
+            var dot11 = xyz1.dot(abcd);
+
+            if (((dot5 > 0) && (dot11 < 0)) || ((dot5 < 0) && (dot11 > 0))) {
+                start_JoinPoints.push(...[vertex0,vertex3,vertex2,vertex1]);;
+            }
+            else {start_JoinPoints.push(...[vertex0,vertex1,vertex2,vertex3]);}
             start_JoinPoints.push(...[vertex0,vertex1,vertex2,vertex3]);
-            //start_JoinPoints.push(...[[10,10,10],[8,8,8],[10,9,9],[9,9,10]]);
+
             for (var k=0; k < this.triangle_pts.length; k++) {
                 this.points.push(...start_JoinPoints[this.triangle_pts[k]]);
             }
         }
+
         start_pts.push(...end_pts);
         for (var j=0; j < this.triangle_pts.length; j++) {  // add this segment's regular points
             this.points.push(...start_pts[this.triangle_pts[j]]);
@@ -116,7 +178,7 @@ ThreeContainer.prototype.addLine = function (geo, diams) {
             }
         }
         else {start_JoinPoints = end_pts;}
-        
+
     }
     // virtual buffer id as color
     const id = this.lines.length + 1;
