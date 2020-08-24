@@ -52,10 +52,11 @@ ThreeContainer.prototype.addLine = function (geo, diams) {
     var n2 = new THREE.Vector3();
     var v2 = new THREE.Vector3();
     var prev_n = new THREE.Vector3();
-    var plane2 = new THREE.Plane();
-    var p1 = new THREE.Vector3();
-    var p2 = new THREE.Vector3();
-    var p3 = new THREE.Vector3();
+    var plane2 = new THREE.Plane(), plane3 = new THREE.Plane();
+    var p1 = new THREE.Vector3(), p2 = new THREE.Vector3(), p3 = new THREE.Vector3();
+    var end0 = new THREE.Vector3(), end1 = new THREE.Vector3(), intersection = new THREE.Vector3();
+    var abcd = new THREE.Vector4(), xyz1 = new THREE.Vector4();
+    var projected = new THREE.Line3;
     var index = this.points.length;
     var start_pts, end_pts, start_JoinPoints;
 
@@ -96,11 +97,10 @@ ThreeContainer.prototype.addLine = function (geo, diams) {
             n.normalize();
             n.multiplyScalar(r0*2);
             var vertex4 = start_JoinPoints[0];
-            var end0 = new THREE.Vector3(vertex4[0]+n.x, vertex4[1]+n.y, vertex4[2]+n.z);
-            var end1 = new THREE.Vector3(vertex4[0]-n.x, vertex4[1]-n.y, vertex4[2]-n.z);
-            var projected = new THREE.Line3(end0, end1);
+            end0.set(vertex4[0]+n.x, vertex4[1]+n.y, vertex4[2]+n.z);
+            end1.set(vertex4[0]-n.x, vertex4[1]-n.y, vertex4[2]-n.z);
+            projected.set(end0, end1);
 
-            var intersection = new THREE.Vector3();
             plane2.intersectLine(projected, intersection);
 
             // use intersection found as new vertex0, by setting v2
@@ -135,7 +135,6 @@ ThreeContainer.prototype.addLine = function (geo, diams) {
         }
         else {   // determine the join points (for before this segment) and add
             // trying out finding the right order for verts (8/19) ---------------------------
-            var plane3 = new THREE.Plane();
             vertex4_prev = start_JoinPoints[0];
             vertex5_prev = start_JoinPoints[1];
             vertex6_prev = start_JoinPoints[2];
@@ -149,8 +148,8 @@ ThreeContainer.prototype.addLine = function (geo, diams) {
             N = plane3.normal;
             
             var d = N.x*vertex4_prev[0] + N.y*vertex4_prev[1] + N.z*vertex4_prev[2];
-            var abcd = new THREE.Vector4(N.x,N.y,N.z,-1*d);
-            var xyz1 = new THREE.Vector4(vertex5_prev[0],vertex5_prev[1],vertex5_prev[2],1);
+            abcd.set(N.x,N.y,N.z,-1*d);
+            xyz1.set(vertex5_prev[0],vertex5_prev[1],vertex5_prev[2],1);
             var dot5 = xyz1.dot(abcd);
 
             xyz1.set(vertex1[0],vertex1[1],vertex1[2],1);
