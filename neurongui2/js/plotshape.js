@@ -22,7 +22,6 @@ function ShapePlot(container) {
 }
 
 function clickEvent(event) {
-    //TODO: try only-one-pixel option again
     var plot = _shape_plots_mapping[$(this).attr('id')];
     mouse.x = event.clientX;
     mouse.y = plot.tc.height - event.clientY;

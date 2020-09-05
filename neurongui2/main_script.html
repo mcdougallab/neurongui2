@@ -111,7 +111,6 @@ function toggle_sp_diam() {
 
 function change_PlotWhat(variable) {
     $('.shapeplot').attr('data-plotwhat', variable);
-    console.log(variable);
     //TODO: change the colorscale min and max default depg. on the variable?
 }
 
@@ -123,8 +122,6 @@ $(window).resize(function () {
     window_resize_timeout = setTimeout(function() {
         resize_graphs();
         // shape plots
-        console.log("window resizing");
-        
         for (var sp of _shape_plots) {
             sp.tc.onContainerResize();
         }        
@@ -132,11 +129,9 @@ $(window).resize(function () {
 });
 
 function update_graph_vectors(graph_vars, action) {
-    console.log(Date.now()/1000);
     // update graph vector plots
     // assumes that vars have only been sent if all vectors have changed or been reinitialized
     // action determines if making or updating plots
-    console.log('action', action);
     //my_gv = graph_vars;
     $("div[class='lineplot']").each( function () {
         graph_count++;
@@ -155,8 +150,6 @@ function update_graph_vectors(graph_vars, action) {
         }
         
         else if (graph_vars[x_var].length > 0) {
-            console.log(graph_vars[x_var].length);
-
             var x_val = graph_vars[x_var]
             var lineplot_data = {}; 
 
@@ -165,7 +158,6 @@ function update_graph_vectors(graph_vars, action) {
                     var y_val = graph_vars[y]
                     lineplot_data[y] = y_val;
                 })
-                console.log(Date.now()/1000);
                 make_lineplot(x_val, lineplot_data, this);
             }
 
@@ -182,7 +174,6 @@ function update_graph_vectors(graph_vars, action) {
                     traces.push(i);
                     i++;
                 })
-                console.log(Date.now()/1000);
                 update_lineplot(new_x_data, new_y_data, traces, this);
             }
         }
@@ -247,7 +238,6 @@ function update_spcolors(segment_values) {
 
 
 function make_lineplot(x_dat, y_dat, object) {
-    console.log("making lineplot");
     // plot each series using a for loop
     var colorpick = ["steelblue", "red", "yellow", "cyan", "green", "#ceed45", "orange", "#c13ed2", "#ff5e63", "pink", "#4b1c87", "black", "grey"];
     var div_jquery = $(object);
@@ -307,8 +297,6 @@ function make_lineplot(x_dat, y_dat, object) {
 };
 
 function update_lineplot(new_x_dat, new_y_dat, traces, object) {
-    console.log("updating lineplot");
-
     var div_jquery = $(object);
     var div_id = div_jquery.attr("id");
 

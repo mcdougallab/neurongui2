@@ -569,7 +569,7 @@ class CefApp(wx.App):
 
 def make_voltage_axis_standalone():
     html = """
-        <div class="lineplot" data-x-var="h.t" data-y-var="seg.v" data-xlab="time (ms)" style="width:90vw; height:90vh;"></div>
+        <div class="lineplot" data-x-var="h.t" data-y-var="seg.v" data-xlab="time (ms)" data-legendlabs="voltage (mV)" style="width:90vw; height:90vh;"></div>
     """   
     this_sec = None
     for sec in h.allsec():
@@ -628,7 +628,6 @@ def _setup_shapeplot_ptrvector(browser_id, sp_id, plotwhat):
     for sec in sections:
         size += sec.nseg
     ptvec = this_browser.shapeplot_ptrvectors.get(sp_id)
-    logging.debug('size: '+str(size))
     if not ptvec:
         this_browser.sp_plotwhats[sp_id] = plotwhat
         if size == 0:
@@ -637,7 +636,6 @@ def _setup_shapeplot_ptrvector(browser_id, sp_id, plotwhat):
             this_browser.shapeplot_ptrvectors[sp_id] = h.PtrVector(size)  #original setup 
             ptvec  = this_browser.shapeplot_ptrvectors[sp_id]
             this_browser.plotwhat_none[sp_id] = [0 for i in range(size)]
-            logging.debug('creating new')
     elif ptvec.size() < size:
         ptvec.resize(size) # morphology added, need to resize
         this_browser.plotwhat_none[sp_id] = [0 for i in range(size)]
@@ -660,7 +658,6 @@ def _setup_shapeplot_ptrvector(browser_id, sp_id, plotwhat):
 
 
 def _update_shapeplot_menus(this_browser, *args, **kwargs):
-    # TODO: allow for nothing to be currently plotted
     rangevars = rangevars_present(list(h.allsec()))
     menu = this_browser.shapeplot_menu
     if menu:
