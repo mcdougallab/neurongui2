@@ -4,7 +4,7 @@ function ThreeContainer(container) {
     this.width = this.container.clientWidth;
     this.height = this.container.clientHeight;
     this.scene = new THREE.Scene();
-    this.pickingScene = new THREE.Scene();
+    this.pickingScene = new THREE.Scene();  // another layer (not rendered) used for attaching ID to segments using colors
     this.pickingScene.background = new THREE.Color(0);
     this.pickingTexture = new THREE.WebGLRenderTarget(this.width, this.height, {format: THREE.RGBFormat});
 
@@ -22,8 +22,8 @@ function ThreeContainer(container) {
     this.lines = [];
     this.linecolors = [];
     this.pickinglinecolors = [];
-    this.triangle_pts = [0,3,7,7,0,4,1,0,4,4,1,5,2,1,5,5,2,6,3,2,6,6,3,7];
-    this.endface_pts = [0,2,1,0,2,3];
+    this.triangle_pts = [0,3,7,7,0,4,1,0,4,4,1,5,2,1,5,5,2,6,3,2,6,6,3,7];  // order of vertices needed to construct the set of triangle making up a prism/ line segment
+    this.endface_pts = [0,2,1,0,2,3];   // two triangles making up an endface square
     this.mesh= new THREE.Mesh();
 
     container.resize(this.onContainerResize);
@@ -88,8 +88,6 @@ ThreeContainer.prototype.addLine = function (geo, diams) {
             n2.set(x1-x0,y1-y0,z1-z0);
             n2.normalize();
             prev_n.copy(n2);
-
-            n2.multiplyScalar(r0*2);            // NEED THIS OR NO????
             plane2.setFromNormalAndCoplanarPoint(n2, new THREE.Vector3(x0,y0,z0));
 
             //create the line segment to project from one corner (v4) to the next
@@ -134,7 +132,7 @@ ThreeContainer.prototype.addLine = function (geo, diams) {
             startflag=false;
         }
         else {   // determine the join points (for before this segment) and add
-            // trying out finding the right order for verts (8/19) ---------------------------
+            // trying out finding the right order for verts 
             vertex4_prev = start_JoinPoints[0];
             vertex5_prev = start_JoinPoints[1];
             vertex6_prev = start_JoinPoints[2];

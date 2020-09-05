@@ -272,10 +272,10 @@ class NEURONFrame(wx.Frame):
 class NEURONWindow(NEURONFrame):
     def __init__(self, html_file=None, user_mappings={}, html=None, title='', size=(600, 400), custom_menus={}):
         self.bindings = cef.JavascriptBindings(bindToFrames=True, bindToPopups=True)
-        self.browser = None
-        self.html_file = html_file
-        self.user_mappings = user_mappings
-        self.rel_vars = []
+        self.browser = None # the CEF embedded browser
+        self.html_file = html_file  
+        self.user_mappings = user_mappings # input variable mappings
+        self.rel_vars = [] # 'relevant' variables: data-* variables to be synced
         self.graph_vars = {}    # graph vector dictionary
         self.browser_sent_vars = {} # keep track not to resend variable just sent from browser
         self.fih = 0    # tracker for whether fInitialize has happened
@@ -283,11 +283,11 @@ class NEURONWindow(NEURONFrame):
         self.ready_status = 1   #browser sends signal that it's ready when done updating graphs
         self.data_waiting = None    #graph data waiting for browser to be ready
         self.t_tracker_vec = "h.t"  #which vector to use for graph tracking
-        self.shapeplot_menu = None
-        self.section_dict = None
-        self.shapeplot_ptrvectors = {}
-        self.sp_plotwhats = {}
-        self.plotwhat_none = {}
+        self.shapeplot_menu = None  # only if there is a shapeplot in window; so it can be updated
+        self.section_dict = None # maps line index to section for click handling in shapeplots
+        self.shapeplot_ptrvectors = {} #SP id : value vectors for all shapeplots
+        self.sp_plotwhats = {}  # SP id : plot what variable for all shapeplots
+        self.plotwhat_none = {} # SP id: list indicating which segments don't have values to plot
 
         # used for tracking when shape plots (if any) need updating
         self._last_diam_change_count = None
@@ -314,17 +314,14 @@ class NEURONWindow(NEURONFrame):
         with open(os.path.join(base_path, 'js', 'ThreeContainer.js')) as f:
             three_container = f.read()
             
-        with open(os.path.join(base_path, 'js', 'MeshLines.js')) as f:
-            meshlines = f.read()
+        with open(os.path.join(base_path, 'js', 'OrbitControls.js')) as f:
+            orbitcontrols = f.read()
 
         with open(os.path.join(base_path, 'auto_style.css')) as f:
             stylesheet = f.read()
 
-        with open(os.path.join(base_path, 'js', 'BufferGeometryUtils.js')) as f:
-            bufferutils = f.read()
-
         self.wrapper_html = my_wrapper_html.replace("HTML_GOES_HERE", my_html).replace('/*STYLESHEET_HERE*/', stylesheet)
-        self.wrapper_html = self.wrapper_html.replace('DECLARE_THREE_JS_HERE', three_js).replace('DECLARE_MESHLINES', meshlines).replace('DECLARE_THREECONTAINER', three_container).replace('DECLARE_PLOTSHAPE_CODE', plotshape_js).replace('DECLARE_BUFFERUTILS_HERE', bufferutils)
+        self.wrapper_html = self.wrapper_html.replace('DECLARE_THREE_JS_HERE', three_js).replace('DECLARE_ORBITCONTROLS', orbitcontrols).replace('DECLARE_THREECONTAINER', three_container).replace('DECLARE_PLOTSHAPE_CODE', plotshape_js)
 
         # Must ignore X11 errors like 'BadWindow' and others by
         # installing X11 error handlers. This must be done after
@@ -572,7 +569,7 @@ class CefApp(wx.App):
 
 def make_voltage_axis_standalone():
     html = """
-        <div class="lineplot" data-x-var="h.t" data-y-var="seg.v" data-xlab="time (ms)" data-legendlabs="voltage (mV)" style="width:90vw; height:90vh;"></div>
+        <div class="lineplot" data-x-var="h.t" data-y-var="seg.v" data-xlab="time (ms)" style="width:90vw; height:90vh;"></div>
     """   
     this_sec = None
     for sec in h.allsec():
@@ -647,8 +644,15 @@ def _setup_shapeplot_ptrvector(browser_id, sp_id, plotwhat):
     i = 0
     for sec in sections: 
         for seg in sec:
-            if hasattr(seg, "_ref_"+plotwhat):
-                ptvec.pset(i, getattr(seg, "_ref_"+plotwhat))
+            obj = seg
+            split_pw = plotwhat.split('.')
+            i_attr = 0
+            len_attr = len(split_pw)
+            while i_attr < (len_attr - 1):
+                obj = getattr(obj, split_pw[i_attr])
+                i_attr += 1
+            if hasattr(obj, "_ref_"+split_pw[i_attr]):
+                ptvec.pset(i, getattr(obj, "_ref_"+split_pw[i_attr]))
                 this_browser.plotwhat_none[sp_id][i] = 0
             else:
                 this_browser.plotwhat_none[sp_id][i] = 1    # mark as None value to plot
@@ -1187,7 +1191,7 @@ def _update_browser_vars(this_browser, locals_copy):
         this_browser._do_reset_geometry(this_browser.browser_id)
         _update_shapeplot_menus(this_browser)
 
-    gather_ptrvectors(this_browser)
+    gather_ptrvectors(this_browser) # gather values to udpate shapeplot coloring
 
     # create dictionary of the changed variables 
     locals_copy.update(this_browser.browser_sent_vars) # don't resend recently updated from browser

@@ -1,6 +1,6 @@
 var neuron_section_data = undefined;
-var _shape_plots_mapping = {};
-var id_map = {};
+var _shape_plots_mapping = {};      // maps div ID to the ShapePlot object
+var id_map = {};        // maps line ID to the index in tc.points that the line's points start
 var mouse = new THREE.Vector2();
 
 function set_neuron_section_data(new_data) {
@@ -35,15 +35,15 @@ function clickEvent(event) {
 
     const id = (pixelBuffer[0] << 16) | (pixelBuffer[1] << 8) | (pixelBuffer[2]);
     if (id != 0) {
-        var index = id_map[id];
+        /*var index = id_map[id];
         var clicked_pts = [];
         for (var k=0; k < 144; k++) {
             if ((index+k) < plot.tc.points.length) {
             clicked_pts.push(plot.tc.points[index+k]);}
-        }
+        }*/
         console.log('intersected!');
         _section_intersected(browser_id, id);
-        console.log(clicked_pts);
+        //console.log(clicked_pts);
     } 
 
 }
@@ -89,36 +89,4 @@ ShapePlot.prototype.update = function(diam_flag) {
 ShapePlot.prototype.force_update = function(diam_flag) {
     this.section_data = undefined;
     this.update(diam_flag);
-}
-
-
-ShapePlot.prototype.set_diam_scale = function(diam) {
-    this.diam_scale = diam;
-    this.force_update(0);
-}
-
-ShapePlot.prototype.update_colors = function(data) {
-    var vmin = this.vmin;
-    var vmax = this.vmax;
-    var vdelta = vmax - vmin;
-    for (var i = 0; i < this.section_data.length; i++) {
-        var v = data[i];
-        var r, g, b;
-        if (v == null) {
-            r = 0;
-            g = 0;
-            b = 0;
-        } else {
-            v = (data[i] - vmin) / vdelta;
-            if (v < 0) {v = 0;}
-            if (v > 1) {v = 1;}
-            r = v;
-            b = 1 - v;
-            g = 0;
-        }
-        var cv = this.tc.lines[i].material.uniforms.color.value;
-        cv.r = r;
-        cv.g = g;
-        cv.b = b;
-    }
 }

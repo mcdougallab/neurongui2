@@ -11,10 +11,9 @@
         <script src="https://d3js.org/d3.v5.min.js"></script>
         <script src="https://d3js.org/d3-scale-chromatic.v1.min.js"></script>
         <script>DECLARE_THREE_JS_HERE</script>
-        <script>DECLARE_MESHLINES</script>
+        <script>DECLARE_ORBITCONTROLS</script>
         <script>DECLARE_THREECONTAINER</script>
         <script>DECLARE_PLOTSHAPE_CODE</script>
-        <script>DECLARE_BUFFERUTILS_HERE</script>
         <style>/*STYLESHEET_HERE*/</style>
         <script>
             function _update_html(selector, content) {
@@ -90,6 +89,7 @@ function update_html_variable_displays(changed, deleted) {
         // deleted variables. individual handling maybe?
         $(`span[data-variable="${key}"]`).text("");
         $(`input[data-variable="${key}"]`).not(':checkbox').val("");
+        $(`label[data-variable="${key}"]`).text("h");
     });
 }
 
@@ -112,7 +112,7 @@ function toggle_sp_diam() {
 function change_PlotWhat(variable) {
     $('.shapeplot').attr('data-plotwhat', variable);
     console.log(variable);
-    //TODO: change the colorscale min and max dep. on the variable?
+    //TODO: change the colorscale min and max default depg. on the variable?
 }
 
 var window_resize_timeout;
@@ -230,7 +230,7 @@ function update_spcolors(segment_values) {
         var spdiv = $(`#${sp_id}`);
         var plot = _shape_plots_mapping[sp_id];
         var FindColor = d3.scaleSequential()
-                .domain([spdiv.attr('data-scalemin'), spdiv.attr('data-scalemax')])
+                .domain([spdiv.attr('data-scalemin'), spdiv.attr('data-scalemax')]) //TODO: account for default if these are not given
                 .interpolator(d3.interpolateViridis);
         // map segment values to a colorscale
         for (i = 0; i < values[0].length; i++) {
@@ -270,7 +270,8 @@ function make_lineplot(x_dat, y_dat, object) {
     var index = 0;
     $.each(y_dat, function(series_name, series_dat) {  // go through each series
         var series_color = colorpick[index%13];
-        var label = legend_labs[index];
+        if (legend_labs) {var label = legend_labs[index];}
+        else {var label = series_name;}
         //plot line
         data.push({
             x: x_dat,
